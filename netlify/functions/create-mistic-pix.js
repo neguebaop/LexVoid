@@ -1,46 +1,90 @@
-// Netlify Function: cria cobrança PIX na MisticPay.
-// Configure no Netlify: MISTIC_CLIENT_ID, MISTIC_CLIENT_SECRET, MISTIC_PIX_ENDPOINT.
-// O endpoint exato vem da documentação da MisticPay. Não coloque o client secret no script.js.
+// Netlify Function: cria cobrança PIX REAL na MisticPay.
+// Variáveis obrigatórias no Netlify:
+// MISTIC_CLIENT_ID=ci_...
+// MISTIC_CLIENT_SECRET=cs_...
+// Opcional: MISTIC_DEFAULT_DOCUMENT=CPF sem pontos, MISTIC_WEBHOOK_URL=url completa do webhook
+
+const API_URL = 'https://api.misticpay.com/api/transactions/create';
+
+function json(statusCode, data){
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    },
+    body: JSON.stringify(data)
+  };
+}
+
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
+  if (event.httpMethod === 'OPTIONS') return json(200, { ok: true });
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+
   try {
     const body = JSON.parse(event.body || '{}');
-    const endpoint = process.env.MISTIC_PIX_ENDPOINT;
     const clientId = process.env.MISTIC_CLIENT_ID;
     const clientSecret = process.env.MISTIC_CLIENT_SECRET;
+
     if (!clientId || !clientSecret) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Configure MISTIC_CLIENT_ID e MISTIC_CLIENT_SECRET no Netlify.' }) };
+      return json(500, { error: 'Configure MISTIC_CLIENT_ID e MISTIC_CLIENT_SECRET no Netlify e faça redeploy.' });
     }
-    if (!endpoint) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Falta MISTIC_PIX_ENDPOINT da documentação MisticPay para criar cobrança automática.' }) };
-    }
+
+    const amount = Number(body.amount || 0);
+    if (!amount || amount < 1) return json(400, { error: 'Valor inválido para gerar PIX.' });
+
+    const siteUrl = (process.env.URL || 'https://lexvoids.netlify.app').replace(/\/$/, '');
+    const webhookUrl = process.env.MISTIC_WEBHOOK_URL || `${siteUrl}/.netlify/functions/mistic-webhook`;
+    const orderId = String(body.orderId || ('DLK-' + Date.now().toString(36).toUpperCase()));
+
+    const payerDocument = String(
+      body.payerDocument ||
+      body.document ||
+      process.env.MISTIC_DEFAULT_DOCUMENT ||
+      '12345678909'
+    ).replace(/\D/g, '').slice(0, 14);
+
     const payload = {
-      amount: Number(body.amount || 0),
-      description: body.description || 'Recarga Dlinky Linkwans',
-      external_id: body.orderId,
-      customer: { email: body.email || '', name: body.name || '' },
-      metadata: { uid: body.uid || '', linkwans: Number(body.linkwans || 0), orderId: body.orderId || '' },
-      webhook_url: process.env.MISTIC_WEBHOOK_URL || `${process.env.URL || ''}/.netlify/functions/mistic-webhook`
+      amount,
+      payerName: String(body.name || body.payerName || body.email || 'Cliente Dlinky').slice(0, 80),
+      payerDocument,
+      transactionId: orderId,
+      description: String(body.description || `Recarga Dlinky - ${body.linkwans || ''} Linkwans`).slice(0, 120),
+      projectWebhook: webhookUrl
     };
-    const res = await fetch(endpoint, {
+
+    const res = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Client-Secret': clientSecret,
-        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+        'ci': clientId,
+        'cs': clientSecret
       },
       body: JSON.stringify(payload)
     });
+
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { statusCode: res.status, body: JSON.stringify({ error: 'Erro MisticPay', details: data }) };
-    return { statusCode: 200, body: JSON.stringify({
-      orderId: body.orderId,
-      raw: data,
-      qrCode: data.qrCode || data.qrcode || data.qr_code || data.pixQrCode || data.pix_qr_code || '',
-      pixCopyPaste: data.pixCopyPaste || data.copyPaste || data.copiaECola || data.pix_code || data.emv || ''
-    }) };
+    if (!res.ok) return json(res.status, { error: 'Erro ao criar PIX na MisticPay', details: data, sent: payload });
+
+    const d = data.data || data;
+    const base64 = d.qrCodeBase64 || d.qrcodeBase64 || d.qr_code_base64 || '';
+    const qrCodeImage = base64
+      ? (String(base64).startsWith('data:') ? base64 : `data:image/png;base64,${base64}`)
+      : '';
+
+    return json(200, {
+      ok: true,
+      orderId,
+      transactionId: d.transactionId || orderId,
+      status: d.transactionState || d.status || 'PENDENTE',
+      qrCodeImage,
+      qrCodeUrl: d.qrcodeUrl || d.qrCodeUrl || d.qrcodeURL || d.qr_code_url || '',
+      pixCopyPaste: d.copyPaste || d.pixCopyPaste || d.copiaECola || d.qrCodeText || '',
+      raw: data
+    });
   } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+    return json(500, { error: e.message });
   }
 };
