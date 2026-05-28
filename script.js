@@ -2380,3 +2380,181 @@ loadLandingFeatured();
   function ensureLandingExtras(){ const landing=q('#landing .hero')||q('#landing'); if(!landing || q('#lexLandingPremium')) return; landing.insertAdjacentHTML('beforeend',`<section id="lexLandingPremium" class="lex-landing-extra"><div class="lex-reveal"><span>✦ Valores Premium</span><h2>Premium LexVoid</h2><p>Desbloqueie molduras premium, neon, badge, favicon, álbum de fotos e remoção da marca.</p><div class="lex-premium-cards"><article><b>Mensal</b><strong>R$ 9,99</strong><small>Duração: 1 mês</small></article><article class="hot"><b>Anual</b><strong>R$ 89,99</strong><small>Duração: 12 meses</small></article></div></div><footer class="lex-footer"><b>LexVoid</b><div><a href="#">Discord</a><a href="#">TikTok</a></div><small>© 2026 LexVoid. Powered by LexVoid.</small></footer></section>`); const io=new IntersectionObserver(es=>es.forEach(x=>x.isIntersecting&&x.target.classList.add('show')),{threshold:.15}); qa('.lex-reveal').forEach(el=>io.observe(el)); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensureLandingExtras); else ensureLandingExtras();
 })();
+
+/* ===== LEXVOID FINAL HOTFIX — custom save, premium page, admin effects layout, owned store ===== */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s), qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').replace(/"/g,'%22');
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'').trim();
+  function isOwnedFrame(f){
+    const inv=Array.isArray(window.user?.inventory)?window.user.inventory:[];
+    const fid=String(f?.id||''); const furl=String(f?.url||''); const fname=norm(f?.name||'');
+    return inv.some(it=>{
+      if(String(it?.type||'').toLowerCase()!=='frame') return false;
+      return (fid && (String(it.id||'')===fid || String(it.itemId||'')===fid || String(it.frameId||'')===fid)) ||
+             (furl && (String(it.url||'')===furl || String(it.value||'')===furl || String(it.frame||'')===furl)) ||
+             (fname && norm(it.name||'')===fname);
+    });
+  }
+  try{
+    window.itemAlreadyOwned = function(kind,id,url,name){
+      const inv=Array.isArray(window.user?.inventory)?window.user.inventory:[];
+      const nname=norm(name||'');
+      return inv.some(it=>{
+        if(String(it?.type||'').toLowerCase()!==String(kind||'').toLowerCase()) return false;
+        return (id && (String(it.id||'')===String(id)||String(it.itemId||'')===String(id))) ||
+               (url && (String(it.url||'')===String(url)||String(it.value||'')===String(url))) ||
+               (nname && norm(it.name||'')===nname);
+      });
+    };
+    try{ itemAlreadyOwned = window.itemAlreadyOwned; }catch(_e){}
+  }catch(_e){}
+
+  function ensureCustomFinalUI(){
+    const holder=q('#customBgFx')?.parentElement;
+    if(holder && !q('#profileLayoutMode')){
+      holder.insertAdjacentHTML('afterend',`<label>Layout do perfil<select id="profileLayoutMode"><option value="full">Card completo</option><option value="icon-only">Só ícone no centro</option><option value="banner-only">Banner + ícone</option></select></label>`);
+    }
+    if(holder && !q('#profileCardShape')){
+      const old=q('#avatarShape');
+      if(old){ old.id='profileCardShape'; const lab=old.closest('label'); if(lab) lab.childNodes[0].textContent='Formato do card'; }
+      else holder.insertAdjacentHTML('afterend',`<label>Formato do card<select id="profileCardShape"><option value="round">Padrão arredondado</option><option value="square">Quadrado</option><option value="pill">Super arredondado</option><option value="sharp">Retângulo dark</option></select></label>`);
+    }
+    const fxPanel=q('#tab-custom .grid2 .panel.form-panel:nth-child(2)');
+    if(fxPanel && !q('#saveFxOnlyFinal')) fxPanel.insertAdjacentHTML('beforeend','<button class="btn primary" id="saveFxOnlyFinal" type="button" style="margin-top:18px">Salvar efeitos</button>');
+  }
+  function fillCustomFinalUI(){
+    ensureCustomFinalUI();
+    const u=window.user||{}; const fx=u.nameFx||{};
+    const map={fxNeonName:'neon',fxShineName:'shine',fxRainbowName:'rainbow',fxPerspective:'perspective',fxGlowCard:'glowCard',fxPulseCard:'pulseCard',fxBorderRun:'borderRun',fxFloatCard:'floatCard',fxAvatarPulse:'avatarPulse',fxBannerShine:'bannerShine'};
+    Object.entries(map).forEach(([id,prop])=>{const el=q('#'+id); if(el) el.checked=!!fx[prop];});
+    if(q('#customName')) q('#customName').value=u.name||'';
+    if(q('#customBio')) q('#customBio').value=u.bio||'';
+    if(q('#customBgFx')) q('#customBgFx').value=u.bgFx||'none';
+    if(q('#fxGlowColor')) q('#fxGlowColor').value=u.fxGlowColor||'#8b5cf6';
+    if(q('#fxCardOpacity')) q('#fxCardOpacity').value=Math.round(Number(u.cardOpacity??.72)*100);
+    if(q('#fxCardBlur')) q('#fxCardBlur').value=Number(u.cardBlur??14);
+    if(q('#fxBannerOpacity')) q('#fxBannerOpacity').value=Math.round(Number(u.bannerOpacity??1)*100);
+    if(q('#profileLayoutMode')) q('#profileLayoutMode').value=u.profileLayout||'full';
+    if(q('#profileCardShape')) q('#profileCardShape').value=u.profileCardShape||u.avatarShape||'round';
+  }
+  function readCustomFinalValues(){
+    const u=window.user; if(!u) return;
+    ensureCustomFinalUI();
+    u.name=q('#customName')?.value.trim()||u.name||'Usuário';
+    u.bio=q('#customBio')?.value||'';
+    u.bgFx=q('#customBgFx')?.value||'none';
+    u.fxGlowColor=q('#fxGlowColor')?.value||'#8b5cf6';
+    u.cardOpacity=Number(q('#fxCardOpacity')?.value||72)/100;
+    u.cardBlur=Number(q('#fxCardBlur')?.value||14);
+    u.bannerOpacity=Number(q('#fxBannerOpacity')?.value||100)/100;
+    u.profileLayout=q('#profileLayoutMode')?.value||'full';
+    u.profileCardShape=q('#profileCardShape')?.value||'round';
+    // mantém avatarShape sem mexer no formato real do avatar; agora esse select controla o card.
+    u.nameFx={
+      neon:!!q('#fxNeonName')?.checked, shine:!!q('#fxShineName')?.checked, rainbow:!!q('#fxRainbowName')?.checked,
+      perspective:!!q('#fxPerspective')?.checked, glowCard:!!q('#fxGlowCard')?.checked, pulseCard:!!q('#fxPulseCard')?.checked,
+      borderRun:!!q('#fxBorderRun')?.checked, floatCard:!!q('#fxFloatCard')?.checked, avatarPulse:!!q('#fxAvatarPulse')?.checked,
+      bannerShine:!!q('#fxBannerShine')?.checked
+    };
+  }
+  async function saveCustomFinalAll(ev){
+    if(ev){ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();}
+    readCustomFinalValues();
+    try{ if(typeof addHistory==='function') addHistory('Customização alterada'); }catch(_e){}
+    try{ await saveUser('Customização salva!'); }catch(e){ try{toast('Customização salva!')}catch(_e){} }
+    setTimeout(fillCustomFinalUI,80);
+    setTimeout(()=>{try{ if(typeof renderProfile==='function' && q('#profile')?.classList.contains('active')) renderProfile(); }catch(_e){}},120);
+  }
+  document.addEventListener('click',function(e){
+    if(e.target && (e.target.id==='saveCustom' || e.target.id==='saveFxOnly' || e.target.id==='saveFxOnlyFinal')) return saveCustomFinalAll(e);
+  },true);
+
+  function applyProfileFinalVisuals(){
+    const u=window.user||{}; const fx=u.nameFx||{}; const card=q('#profileCard'), name=q('#profileName'), banner=q('#profileBanner'), avatar=q('#profileAvatar');
+    if(!card) return;
+    card.classList.remove('layout-full','layout-icon-only','layout-banner-only','cardshape-round','cardshape-square','cardshape-pill','cardshape-sharp','fx-glow-card','fx-pulse-card','fx-border-run','fx-float-card');
+    card.classList.add('layout-'+(u.profileLayout||'full'));
+    card.classList.add('cardshape-'+(u.profileCardShape||u.avatarShape||'round'));
+    card.classList.toggle('fx-glow-card',!!fx.glowCard); card.classList.toggle('fx-pulse-card',!!fx.pulseCard); card.classList.toggle('fx-border-run',!!fx.borderRun); card.classList.toggle('fx-float-card',!!fx.floatCard);
+    card.style.setProperty('--user-glow',u.fxGlowColor||'#8b5cf6');
+    card.style.setProperty('--card-alpha',String(u.cardOpacity??.72));
+    card.style.setProperty('--card-blur',(u.cardBlur??14)+'px');
+    if(name){ name.classList.toggle('fx-neon-name',!!fx.neon); name.classList.toggle('fx-shine-name',!!fx.shine); name.classList.toggle('fx-rainbow-name',!!fx.rainbow); name.style.setProperty('--user-glow',u.fxGlowColor||'#8b5cf6'); }
+    if(banner){ banner.style.opacity=String(u.bannerOpacity??1); banner.classList.toggle('fx-banner-shine',!!fx.bannerShine); }
+    if(avatar){ avatar.classList.toggle('fx-avatar-pulse',!!fx.avatarPulse); }
+    if(fx.perspective){
+      card.onmousemove=(ev)=>{const r=card.getBoundingClientRect(); const px=(ev.clientX-r.left)/Math.max(1,r.width); const py=(ev.clientY-r.top)/Math.max(1,r.height); card.style.transform=`perspective(900px) rotateX(${(0.5-py)*18}deg) rotateY(${(px-0.5)*18}deg)`;};
+      card.onmouseleave=()=>{card.style.transform='';};
+    } else { card.onmousemove=null; card.onmouseleave=null; card.style.transform=''; }
+  }
+  const oldRP=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){ if(oldRP) oldRP(); applyProfileFinalVisuals(); };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(_e){}
+
+  const oldRD=window.renderDash || (typeof renderDash==='function'?renderDash:null);
+  window.renderDash=function(){ if(oldRD) oldRD(); fillCustomFinalUI(); fixAdminEffectsFinalLayout(); };
+  try{ if(typeof renderDash!=='undefined') renderDash=window.renderDash; }catch(_e){}
+
+  function framePreview(url){return `<div class="zyo-frame-preview"><span class="shop-avatar" style="background-image:${window.user?.avatar?`url('${safe(window.user.avatar)}')`:'none'}"></span>${url?`<img src="${safe(url)}" alt="">`:''}</div>`;}
+  function durationSelect(id){return `<select class="zyo-duration" data-duration-for="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="perm">Permanente</option></select>`;}
+  function shopFrameCardFinal(f){
+    const id=String(f.id||f.url||f.name||'frame'); const bought=isOwnedFrame(f); const price=Number(f.price||f.prices?.perm||20);
+    return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top">${framePreview(f.url||'')}<div><h3>${esc(f.name||'Moldura')}</h3><p>${esc(f.desc||'')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${durationSelect('frame_'+id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-frame="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-frame="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+  async function loadAdminEffectsFinal(){
+    try{ const snap=await firebase.firestore().collection('adminEffects').orderBy('createdAt','desc').get(); window.__lexAdminEffects=snap.docs.map(d=>({id:d.id,...d.data()})); }
+    catch(e){ window.__lexAdminEffects=window.__lexAdminEffects||[]; }
+  }
+  function renderAdminEffectsFinal(){
+    const list=q('#adminEffectsList'); if(!list) return; const arr=window.__lexAdminEffects||[];
+    list.innerHTML=arr.map(e=>`<div class="admin-effect-item"><img src="${safe(e.url||'')}" onerror="this.style.display='none'"><div><b>${esc(e.name||'Efeito')}</b><small>${esc(e.desc||'')}</small><small>${Number(e.price||0)} Linkwuans</small></div><button class="delete" type="button" data-admin-del-effect-final="${esc(e.id)}">×</button></div>`).join('')||'<p>Nenhum efeito cadastrado.</p>';
+  }
+  function fixAdminEffectsFinalLayout(){ q('#tab-adminEffects')?.classList.add('lex-admin-effects-fixed-final'); }
+  document.addEventListener('click',async function(e){
+    if(e.target?.id==='adminAddEffect'){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      const item={name:q('#adminEffectName')?.value.trim()||'',desc:q('#adminEffectDesc')?.value.trim()||'',price:Number(q('#adminEffectPrice')?.value||20),url:q('#adminEffectUrl')?.value.trim()||'',type:'bannerEffect',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      if(!item.name||!item.url) return toast('Coloque nome e URL do efeito.');
+      await firebase.firestore().collection('adminEffects').add(item); await loadAdminEffectsFinal(); renderAdminEffectsFinal(); toast('Efeito cadastrado.');
+    }
+    if(e.target?.dataset?.adminDelEffectFinal){ e.preventDefault(); await firebase.firestore().collection('adminEffects').doc(e.target.dataset.adminDelEffectFinal).delete(); await loadAdminEffectsFinal(); renderAdminEffectsFinal(); toast('Efeito removido.'); }
+  },true);
+
+  const oldShopFinal=window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){
+    if(oldShopFinal) oldShopFinal();
+    const grid=q('#shopGrid'); if(!grid) return;
+    const mode=window.shopMode || (typeof shopMode!=='undefined'?shopMode:'coins');
+    if(mode==='frames'){
+      grid.className='zyo-shop-grid';
+      const frames=Array.isArray(window.customFrames)?window.customFrames:(typeof customFrames!=='undefined'?customFrames:[]);
+      grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras cadastradas pelo admin.</p></div>`+(frames||[]).map(shopFrameCardFinal).join('');
+      if(!frames.length) grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Nenhuma moldura cadastrada pelo admin ainda.</p></div>`;
+    }
+    if(mode==='effects'){
+      const arr=window.__lexAdminEffects||[]; grid.className='zyo-shop-grid lex-effects-shop';
+      grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+arr.map(e=>`<div class="zyo-item-card"><div class="zyo-item-top"><div class="zyo-effect-banner-preview" style="background-image:url('${safe(e.url||'')}')"></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'')}</p></div></div><div class="zyo-price">▣ Preço do item: <b>${Number(e.price||20)} Linkwuans</b></div>${durationSelect('effect_'+e.id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-admin-effect="${esc(e.id)}">🔒 Comprar</button><button class="btn dark small" type="button" data-gift-effect="${esc(e.id)}">🎁 Presentear</button></div></div>`).join('');
+      if(!arr.length) grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Nenhum efeito cadastrado pelo admin ainda.</p></div>`;
+    }
+  };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(_e){}
+
+  function showPremiumPage(){
+    if(location.hash!=='#/premium') return;
+    const simple=q('#simple'); if(!simple) return;
+    simple.classList.add('active'); qa('.page').forEach(p=>{if(p!==simple)p.classList.remove('active')});
+    let main=q('#lexPremiumPage');
+    if(!main){
+      simple.innerHTML=`<header class="topbar glass smallbar lexvoid-top"><a class="brand" href="#/"><span class="brand-icon lex-logo">LV</span><strong>LexVoid</strong></a><nav><a href="#/">Início</a><a href="#/premium">Premium</a><a href="#/community">Comunidade</a></nav><button class="theme-toggle" data-action="toggleTheme">☾</button><button class="btn primary" data-goto="dashboard">▦ Dashboard</button></header><main id="lexPremiumPage" class="lex-premium-page"><span class="premium-pill">🪙 Preços Premium</span><h1>Valores do Premium</h1><p>Premium LexVoid é muito mais que status... desfrute de benefícios!</p><section class="premium-price-row"><article><div class="price-icon">◉</div><h2>Mensal</h2><small>Duração: 1 mês</small><strong>R$ 9,99 <em>/mês</em></strong><span>Não há recorrência</span><button class="btn dark">Comprar →</button></article><article class="hot"><div class="price-icon">✹</div><h2>Anual</h2><small>Duração: 12 meses</small><strong>R$ 89,99 <em>/ano</em></strong><span>Não há recorrência</span><button class="btn dark">Comprar →</button></article></section><section class="premium-features"><h2>Recursos do Premium</h2><div><article>🖼️ <b>Moldura Premium</b><small>Seu avatar com moldura Premium.</small></article><article>🔮 <b>Neon Premium</b><small>Neon colorido ao redor de seu card.</small></article><article>✦ <b>Badge Premium</b><small>Insígnia Premium direto em seu perfil.</small></article><article>✅ <b>Badge Verificado</b><small>Insígnia Verificado ao lado de seu nome.</small></article><article>🧿 <b>Favicon</b><small>Envie o ícone de seu perfil no navegador.</small></article><article>📸 <b>Álbum de Fotos</b><small>Crie e compartilhe fotos exclusivas.</small></article><article>⬆️ <b>Maior limite de upload</b><small>Envie arquivo de fundo com maior limite.</small></article><article>🏷️ <b>Ocultar marca d’água</b><small>Remova a marca d’água de seu perfil.</small></article></div></section><footer class="lex-footer"><b><span class="brand-icon lex-logo">LV</span> LexVoid</b><div><a href="https://discord.com/" target="_blank">Discord</a><a href="https://www.tiktok.com/" target="_blank">TikTok</a></div><small>© 2026 LexVoid. Todos os direitos reservados. Powered by linkroubadão.</small></footer></main>`;
+    }
+  }
+  window.addEventListener('hashchange',()=>setTimeout(showPremiumPage,20));
+  document.addEventListener('click',e=>{ const a=e.target.closest('a[href="#/premium"],[data-goto="premium"]'); if(a) setTimeout(showPremiumPage,20); });
+
+  async function bootFinal(){
+    ensureCustomFinalUI(); fillCustomFinalUI(); fixAdminEffectsFinalLayout(); await loadAdminEffectsFinal(); renderAdminEffectsFinal(); showPremiumPage();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootFinal); else bootFinal();
+})();
