@@ -2558,3 +2558,188 @@ loadLandingFeatured();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootFinal); else bootFinal();
 })();
+
+
+/* === LEXVOID HOTFIX DEFINITIVO: admin efeitos dentro do painel + customização salvando + loja owned === */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safeUrl=s=>String(s||'').replace(/["'<>]/g,'');
+  function say(t){try{ if(typeof toast==='function') return toast(t); }catch(e){} console.log(t);}
+  function getDB(){try{return firebase.firestore()}catch(e){return null}}
+  function getFrames(){try{ return Array.isArray(window.customFrames)?window.customFrames:(typeof customFrames!=='undefined'&&Array.isArray(customFrames)?customFrames:[]);}catch(e){return []}}
+  function getEffects(){return window.__lexAdminEffectsFixed||window.__lexAdminEffects||[]}
+  function inv(){return Array.isArray(window.user?.inventory)?window.user.inventory:[]}
+  function norm(v){return String(v||'').toLowerCase().trim();}
+  function frameOwned(f){
+    const ids=[f.id,f.itemId,f.name,f.url,f.value].map(norm).filter(Boolean);
+    return inv().some(it=>{
+      const vals=[it.id,it.itemId,it.name,it.url,it.value].map(norm).filter(Boolean);
+      if(it.type && !/frame|moldura/.test(norm(it.type))) return false;
+      return vals.some(v=>ids.includes(v));
+    });
+  }
+  function effectOwned(e){
+    const ids=[`effect:${e.id}`,e.id,e.itemId,e.name,e.url,e.value].map(norm).filter(Boolean);
+    return inv().some(it=>{
+      const vals=[it.id,it.itemId,it.name,it.url,it.value].map(norm).filter(Boolean);
+      if(it.type && !/effect|efeito|banner/.test(norm(it.type))) return false;
+      return vals.some(v=>ids.includes(v));
+    });
+  }
+
+  // Garante que Admin Efeitos esteja visualmente dentro do dashboard, mesmo se algum HTML antigo ficar fora.
+  function mountAdminEffects(){
+    const tab=q('#tab-adminEffects');
+    const main=q('#dashboard .dash-main');
+    if(tab && main && tab.parentElement!==main){ main.appendChild(tab); }
+    if(tab){
+      tab.classList.add('lex-admin-effects-clean');
+      const grid=tab.querySelector('.grid2'); if(grid) grid.classList.add('admin-effects-grid-clean');
+    }
+  }
+
+  async function loadAdminEffectsClean(){
+    const db=getDB(); if(!db) return [];
+    try{
+      const snap=await db.collection('adminEffects').orderBy('createdAt','desc').get();
+      window.__lexAdminEffectsFixed=snap.docs.map(d=>({id:d.id,...d.data()}));
+    }catch(e){ window.__lexAdminEffectsFixed=window.__lexAdminEffectsFixed||[]; }
+    return window.__lexAdminEffectsFixed;
+  }
+  function renderAdminEffectsClean(){
+    mountAdminEffects();
+    const list=q('#adminEffectsList'); if(!list) return;
+    const arr=getEffects();
+    list.innerHTML=arr.length?arr.map(e=>`<div class="admin-effect-row-clean"><div class="admin-effect-thumb-clean" style="background-image:url('${safeUrl(e.url)}')"></div><div class="admin-effect-info-clean"><b>${esc(e.name||'Efeito')}</b><small>${esc(e.desc||'')}</small><small>${Number(e.price||20)} Linkwuans</small></div><button class="delete" type="button" data-del-admin-effect-clean="${esc(e.id)}">×</button></div>`).join(''):'<p>Nenhum efeito cadastrado.</p>';
+  }
+  window.renderAdminEffectsFinal=renderAdminEffectsClean;
+  window.renderAdminEffects=renderAdminEffectsClean;
+
+  async function addAdminEffectClean(ev){
+    ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+    const db=getDB(); if(!db) return say('Firebase não carregou.');
+    const item={
+      name:q('#adminEffectName')?.value.trim()||'',
+      desc:q('#adminEffectDesc')?.value.trim()||'',
+      price:Number(q('#adminEffectPrice')?.value||20),
+      url:q('#adminEffectUrl')?.value.trim()||'',
+      type:'bannerEffect',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy:firebase.auth().currentUser?.email||''
+    };
+    if(!item.name || !item.url) return say('Coloque nome e URL do efeito.');
+    await db.collection('adminEffects').add(item);
+    ['adminEffectName','adminEffectDesc','adminEffectPrice','adminEffectUrl'].forEach(id=>{const el=q('#'+id); if(el) el.value='';});
+    await loadAdminEffectsClean(); renderAdminEffectsClean();
+    if((window.shopMode||(typeof shopMode!=='undefined'?shopMode:''))==='effects') renderShopClean();
+    say('Efeito cadastrado.');
+  }
+  document.addEventListener('click',async function(e){
+    if(e.target?.id==='adminAddEffect') return addAdminEffectClean(e);
+    const del=e.target?.closest('[data-del-admin-effect-clean]');
+    if(del){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); await getDB().collection('adminEffects').doc(del.dataset.delAdminEffectClean).delete(); await loadAdminEffectsClean(); renderAdminEffectsClean(); if((window.shopMode||(typeof shopMode!=='undefined'?shopMode:''))==='effects') renderShopClean(); say('Efeito removido.'); }
+  },true);
+
+  // Controles de customização: formato do CARD e layout salvam e voltam corretamente.
+  function ensureCustomClean(){
+    const holder=q('#customBgFx')?.parentElement;
+    if(holder && !q('#profileLayoutMode')) holder.insertAdjacentHTML('afterend',`<label>Layout do perfil<select id="profileLayoutMode"><option value="full">Card completo</option><option value="icon-only">Só ícone no centro</option><option value="banner-only">Banner + ícone</option></select></label>`);
+    if(holder && !q('#profileCardShape')) holder.insertAdjacentHTML('afterend',`<label>Formato do card<select id="profileCardShape"><option value="round">Redondo</option><option value="square">Quadrado</option><option value="pill">Retangular arredondado</option><option value="sharp">Triângulo</option></select></label>`);
+    const old=q('#avatarShape'); if(old) old.closest('label')?.remove();
+    const effectsPanel=q('#tab-custom .grid2 .panel.form-panel:nth-child(2)');
+    if(effectsPanel && !q('#saveFxOnlyClean')) effectsPanel.insertAdjacentHTML('beforeend','<button class="btn primary" id="saveFxOnlyClean" type="button">Salvar efeitos</button>');
+  }
+  function fillCustomClean(){
+    ensureCustomClean();
+    const u=window.user||{}; const fx=u.nameFx||{};
+    const map={fxNeonName:'neon',fxShineName:'shine',fxRainbowName:'rainbow',fxPerspective:'perspective',fxGlowCard:'glowCard',fxPulseCard:'pulseCard',fxBorderRun:'borderRun',fxFloatCard:'floatCard',fxAvatarPulse:'avatarPulse',fxBannerShine:'bannerShine'};
+    Object.entries(map).forEach(([id,prop])=>{const el=q('#'+id); if(el) el.checked=!!fx[prop];});
+    if(q('#profileLayoutMode')) q('#profileLayoutMode').value=u.profileLayout||'full';
+    if(q('#profileCardShape')) q('#profileCardShape').value=u.profileCardShape||'round';
+    if(q('#fxGlowColor')) q('#fxGlowColor').value=u.fxGlowColor||'#8b5cf6';
+    if(q('#fxCardOpacity')) q('#fxCardOpacity').value=Math.round((u.cardOpacity??0.72)*100);
+    if(q('#fxCardBlur')) q('#fxCardBlur').value=Number(u.cardBlur??14);
+    if(q('#fxBannerOpacity')) q('#fxBannerOpacity').value=Math.round((u.bannerOpacity??1)*100);
+    if(q('#customName')) q('#customName').value=u.name||'';
+    if(q('#customBio')) q('#customBio').value=u.bio||'';
+    if(q('#customBgFx')) q('#customBgFx').value=u.bgFx||'none';
+  }
+  function readCustomClean(){
+    const u=window.user||{};
+    if(q('#customName')) u.name=q('#customName').value.trim()||u.name;
+    if(q('#customBio')) u.bio=q('#customBio').value;
+    u.bgFx=q('#customBgFx')?.value||u.bgFx||'none';
+    u.profileLayout=q('#profileLayoutMode')?.value||'full';
+    u.profileCardShape=q('#profileCardShape')?.value||'round';
+    u.avatarShape='round'; // não mexe mais no avatar; este campo antigo não controla o card.
+    u.fxGlowColor=q('#fxGlowColor')?.value||u.fxGlowColor||'#8b5cf6';
+    u.cardOpacity=Number(q('#fxCardOpacity')?.value||72)/100;
+    u.cardBlur=Number(q('#fxCardBlur')?.value||14);
+    u.bannerOpacity=Number(q('#fxBannerOpacity')?.value||100)/100;
+    u.nameFx={
+      neon:!!q('#fxNeonName')?.checked, shine:!!q('#fxShineName')?.checked, rainbow:!!q('#fxRainbowName')?.checked,
+      perspective:!!q('#fxPerspective')?.checked, glowCard:!!q('#fxGlowCard')?.checked, pulseCard:!!q('#fxPulseCard')?.checked,
+      borderRun:!!q('#fxBorderRun')?.checked, floatCard:!!q('#fxFloatCard')?.checked, avatarPulse:!!q('#fxAvatarPulse')?.checked, bannerShine:!!q('#fxBannerShine')?.checked
+    };
+    window.user=u;
+  }
+  async function saveCustomClean(ev){
+    ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+    readCustomClean();
+    try{ await saveUser('Customização salva!'); }catch(e){ say('Customização salva!'); }
+    fillCustomClean(); applyProfileClean();
+  }
+  document.addEventListener('click',function(e){ if(e.target?.id==='saveCustom'||e.target?.id==='saveFxOnlyClean'||e.target?.id==='saveFxOnlyFinal'||e.target?.id==='saveFxOnly') return saveCustomClean(e); },true);
+
+  function applyProfileClean(){
+    const u=window.user||{}; const fx=u.nameFx||{};
+    const card=q('#profileCard'), name=q('#profileName'), banner=q('#profileBanner'), avatar=q('#profileAvatar'); if(!card) return;
+    card.classList.remove('layout-full','layout-icon-only','layout-banner-only','cardshape-round','cardshape-square','cardshape-pill','cardshape-sharp','fx-glow-card','fx-pulse-card','fx-border-run','fx-float-card');
+    card.classList.add('layout-'+(u.profileLayout||'full'),'cardshape-'+(u.profileCardShape||'round'));
+    card.classList.toggle('fx-glow-card',!!fx.glowCard); card.classList.toggle('fx-pulse-card',!!fx.pulseCard); card.classList.toggle('fx-border-run',!!fx.borderRun); card.classList.toggle('fx-float-card',!!fx.floatCard);
+    card.style.setProperty('--user-glow',u.fxGlowColor||'#8b5cf6'); card.style.setProperty('--card-alpha',String(u.cardOpacity??0.72)); card.style.setProperty('--card-blur',(u.cardBlur??14)+'px');
+    if(name){ name.classList.toggle('fx-neon-name',!!fx.neon); name.classList.toggle('fx-shine-name',!!fx.shine); name.classList.toggle('fx-rainbow-name',!!fx.rainbow); name.style.setProperty('--user-glow',u.fxGlowColor||'#8b5cf6'); }
+    if(banner){ banner.style.opacity=String(u.bannerOpacity??1); banner.classList.toggle('fx-banner-shine',!!fx.bannerShine); }
+    if(avatar) avatar.classList.toggle('fx-avatar-pulse',!!fx.avatarPulse);
+    // Card acompanha o mouse em todos os lados, sem travar em um lado só.
+    if(fx.perspective){
+      card.onpointermove=function(ev){ const r=card.getBoundingClientRect(); const x=(ev.clientX-(r.left+r.width/2))/(r.width/2); const y=(ev.clientY-(r.top+r.height/2))/(r.height/2); card.style.transform=`perspective(900px) rotateX(${-y*10}deg) rotateY(${x*10}deg) translate3d(${x*4}px,${y*4}px,0)`; };
+      card.onpointerleave=function(){ card.style.transform=''; };
+      card.onmousemove=null;
+    }else{ card.onpointermove=null; card.onpointerleave=null; card.onmousemove=null; card.onmouseleave=null; card.style.transform=''; }
+  }
+  window.applyProfileClean=applyProfileClean;
+
+  function framePreviewClean(f){return `<div class="zyo-frame-preview"><span class="shop-avatar" style="background-image:${window.user?.avatar?`url('${safeUrl(window.user.avatar)}')`:'none'}"></span>${f.url?`<img src="${safeUrl(f.url)}" alt="">`:''}</div>`;}
+  function durationSelect(id){return `<select class="zyo-duration" data-duration-for="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="perm">Permanente</option></select>`;}
+  function frameCard(f){ const id=String(f.id||f.url||f.name); const bought=frameOwned(f); const price=Number(f.price||f.prices?.perm||20); return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top">${framePreviewClean(f)}<div><h3>${esc(f.name||'Moldura')}</h3><p>${esc(f.desc||'')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${durationSelect('frame_'+id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-frame="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-frame="${esc(id)}">🎁 Presentear</button></div></div>`;}
+  function effectCard(e){ const id=String(e.id||e.url||e.name); const bought=effectOwned(e); const price=Number(e.price||20); return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top"><div class="zyo-effect-banner-preview" style="background-image:url('${safeUrl(e.url)}')"></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'Efeito de banner')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${durationSelect('effect_'+id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-admin-effect="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-effect="${esc(id)}">🎁 Presentear</button></div></div>`;}
+  function renderShopClean(){
+    const grid=q('#shopGrid'); if(!grid) return;
+    const mode=window.shopMode || (typeof shopMode!=='undefined'?shopMode:'coins');
+    if(mode==='frames'){
+      const frames=getFrames(); grid.className='zyo-shop-grid'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras cadastradas pelo admin.</p></div>`+(frames.length?frames.map(frameCard).join(''):'<p>Nenhuma moldura cadastrada pelo admin ainda.</p>'); return;
+    }
+    if(mode==='effects'){
+      const effects=getEffects(); grid.className='zyo-shop-grid lex-effects-shop'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+(effects.length?effects.map(effectCard).join(''):'<p>Nenhum efeito cadastrado pelo admin ainda.</p>'); return;
+    }
+    if(mode==='other'){
+      grid.innerHTML=`<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>`; return;
+    }
+  }
+  const oldShopAny=window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){ if(oldShopAny) oldShopAny(); renderShopClean(); };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(e){}
+
+  const oldDash=window.renderDash || (typeof renderDash==='function'?renderDash:null);
+  window.renderDash=function(){ if(oldDash) oldDash(); mountAdminEffects(); fillCustomClean(); renderAdminEffectsClean(); };
+  try{ if(typeof renderDash!=='undefined') renderDash=window.renderDash; }catch(e){}
+  const oldProfile=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){ if(oldProfile) oldProfile(); applyProfileClean(); };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  document.addEventListener('DOMContentLoaded',async()=>{ mountAdminEffects(); ensureCustomClean(); fillCustomClean(); await loadAdminEffectsClean(); renderAdminEffectsClean(); });
+  setTimeout(async()=>{ mountAdminEffects(); fillCustomClean(); await loadAdminEffectsClean(); renderAdminEffectsClean(); },700);
+})();
