@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dlinky — Perfil gamer premium</title>
+  <title>LexVoid — Perfil gamer premium</title>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,11 +15,11 @@
 <body>
   <div id="dlinkyProfileHudPlayer" class="dlinky-profile-hud-player">
     <div class="dlinky-hud-left">
-      <span class="dlinky-hud-brand">dlinky</span>
+      <span class="dlinky-hud-brand">LexVoid</span>
       <button type="button" id="dlinkyHudMute" class="dlinky-hud-btn">🔊</button>
       <input type="range" id="dlinkyHudVolume" class="dlinky-hud-volume" min="0" max="100" value="70">
     </div>
-    <div class="dlinky-hud-credit">❤ Feito por Dlinky</div>
+    <div class="dlinky-hud-credit">❤ Feito por LexVoid</div>
   </div>
   <canvas id="particlesCanvas"></canvas>
   <div id="toast"></div>
@@ -27,29 +27,29 @@
 
   <section id="landing" class="page active">
     <header class="topbar glass">
-      <a class="brand" href="#/"><span class="brand-icon">D</span><strong>Dlinky</strong></a>
+      <a class="brand" href="#/"><span class="brand-icon">LV</span><strong>LexVoid</strong></a>
       <nav><a href="#/">Início</a><a href="#/assets">Linky</a><a href="#/premium">Premium</a><a href="#/community">Comunidade</a></nav>
       <button class="theme-toggle" data-action="toggleTheme">☾</button>
       <button class="btn ghost" data-goto="login">Login</button>
     </header>
     <main class="hero">
-      <div class="pill">✦ Seja um membro agora da Dlinky ✦</div>
+      <div class="pill">✦ Seja um membro agora da LexVoid ✦</div>
       <h1>Toda sua personalidade<br>em um só lugar</h1>
       <p>Crie uma biografia gamer moderna com links, ícones sociais, música, vídeo/GIF de fundo, partículas e decorações animadas estilo Discord.</p>
       <div class="hero-actions"><button class="btn primary big" data-goto="register">Começar gratuitamente →</button><button class="btn dark big" data-goto="premium">★ Conhecer premium</button></div>
       <div class="stats clean-stats"><div><span>USUÁRIOS</span><strong data-count-to="14720">0</strong></div><div><span>LINKS</span><strong data-count-to="7570">0</strong></div><div><span>REDES</span><strong data-count-to="48630">0</strong></div></div>
       <div class="zyo-marquee" aria-label="Usuários em destaque"><div class="zyo-marquee-track"><span>👤 Lariogth <small>/lariogth</small></span><span>👤 Snow011 <small>/snow011</small></span><span>👤 wnk <small>/wnk</small></span><span>👤 natsumi <small>/natsumi</small></span><span>👤 raphafxp <small>/raphafxp</small></span><span>👤 Lucasxs <small>/lucasxs</small></span><span>👤 Linkroubadao <small>/linkroubadao</small></span><span>👤 Ryuk <small>/ryuk</small></span></div></div>
-      <section class="zyo-home-features"><div class="pill">ⓘ Saiba mais sobre a Dlinky</div><h2>Veja alguns recursos disponíveis</h2><p>Acompanhe nos cards abaixo alguns dos recursos mais utilizados.</p><div class="feature-grid"><article><em>1</em><b>🔗 Redes Sociais</b><span>Adicione quantas redes sociais desejar em seu perfil.</span></article><article><em>2</em><b>🔗 Links Personalizados</b><span>Compartilhe todos os seus links importantes em um só lugar.</span></article><article><em>3</em><b>🎵 Áudio e Vídeo</b><span>Personalize com músicas, vídeos e background animado.</span></article><article><em>4</em><b>⭐ Dlinky Premium</b><span>Desbloqueie recursos exclusivos, molduras e selos especiais.</span></article></div></section>
+      <section class="zyo-home-features"><div class="pill">ⓘ Saiba mais sobre a LexVoid</div><h2>Veja alguns recursos disponíveis</h2><p>Acompanhe nos cards abaixo alguns dos recursos mais utilizados.</p><div class="feature-grid"><article><em>1</em><b>🔗 Redes Sociais</b><span>Adicione quantas redes sociais desejar em seu perfil.</span></article><article><em>2</em><b>🔗 Links Personalizados</b><span>Compartilhe todos os seus links importantes em um só lugar.</span></article><article><em>3</em><b>🎵 Áudio e Vídeo</b><span>Personalize com músicas, vídeos e background animado.</span></article><article><em>4</em><b>⭐ LexVoid Premium</b><span>Desbloqueie recursos exclusivos, molduras e selos especiais.</span></article></div></section>
 </main>
   </section>
 
   <section id="auth" class="page">
-    <header class="topbar glass smallbar"><a class="brand" href="#/"><span class="brand-icon">D</span><strong>Dlinky</strong></a><nav><a href="#/">Início</a><a href="#/premium">Premium</a></nav></header>
+    <header class="topbar glass smallbar"><a class="brand" href="#/"><span class="brand-icon">LV</span><strong>LexVoid</strong></a><nav><a href="#/">Início</a><a href="#/premium">Premium</a></nav></header>
     <main class="auth-wrap">
       <form class="auth-card glass" id="registerForm">
         <div class="auth-title"><span>✎</span><div><h2>Criar uma conta</h2><p>Preencha os dados para registrar-se</p></div></div>
         <label>Nome<input id="regName" maxlength="50" placeholder="Digite seu nome" required></label>
-        <label>Seu link<div class="slug-row"><span>dlinky/</span><input id="regSlug" placeholder="seunome" required></div></label>
+        <label>Seu link<div class="slug-row"><span>lexvoid/</span><input id="regSlug" placeholder="seunome" required></div></label>
         <label>E-mail<input id="regEmail" type="email" placeholder="Digite seu e-mail" required></label>
         <label>Senha<input id="regPass" type="password" placeholder="Digite sua senha" required></label>
         <label>Confirmar senha<input id="regPass2" type="password" placeholder="Confirme sua senha" required></label>
@@ -57,7 +57,7 @@
         <p class="switch">Já possui uma conta? <a href="#/login">Entre já!</a></p>
       </form>
       <form class="auth-card glass" id="loginForm">
-        <div class="auth-title"><span>↪</span><div><h2>Entrar na conta</h2><p>Acesse seu painel Dlinky</p></div></div>
+        <div class="auth-title"><span>↪</span><div><h2>Entrar na conta</h2><p>Acesse seu painel LexVoid</p></div></div>
         <label>E-mail<input id="loginEmail" type="email" placeholder="Digite seu e-mail" required></label>
         <label>Senha<input id="loginPass" type="password" placeholder="Digite sua senha" required></label>
         <button class="btn primary full">Login</button>
@@ -68,7 +68,7 @@
 
   <section id="dashboard" class="page dash-page">
     <aside class="sidebar" id="sidebar">
-      <div class="side-head"><b>dlinky</b><button data-action="collapseSide" title="recolher/abrir">‹</button></div>
+      <div class="side-head"><b>LexVoid</b><button data-action="collapseSide" title="recolher/abrir">‹</button></div>
       <div class="side-group open"><button class="side-title">▦ Painel <span>⌄</span></button><div class="side-items">
         <a class="side-link active" data-tab="home">▦ Início</a><a class="side-link" data-tab="store">▣ Loja</a>
       </div></div>
@@ -84,14 +84,14 @@
         <a class="side-link" data-tab="payments">▣ Pagamentos</a><a class="side-link" data-tab="inventory">▦ Inventário</a><a class="side-link" data-tab="history">◷ Histórico</a><a class="side-link admin-only" data-tab="admin" style="display:none">⚜ Admin</a>
 <a class="side-link admin-only" data-tab="adminSelos" style="display:none">🏷 Admin Selos</a>
       </div></div>
-      <div class="side-user"><span class="avatar tiny" id="sideAvatar"></span><div><b id="sideName">usuário</b><small id="sideUrl">dlinky/usuario</small></div></div>
+      <div class="side-user"><span class="avatar tiny" id="sideAvatar"></span><div><b id="sideName">usuário</b><small id="sideUrl">lexvoid/usuario</small></div></div>
     </aside>
     <main class="dash-main">
       <div class="dash-top"><button class="menu-btn" data-action="openSide">☰</button><h2>Dashboard</h2><div class="spacer"></div><button class="btn primary" id="viewProfile">⊙ Ver Perfil</button><button class="btn dark" data-tab="account">⚙ Configurações</button><button class="theme-toggle" data-action="toggleTheme">☾</button></div>
       <div class="notice glass"><b>Sua conta ainda não foi ativada.</b><p>Confirme seu e-mail para liberar todas as funções do painel.</p><button class="btn primary small">▷ Solicitar verificação</button><button class="btn dark small" data-tab="account">⚙ Alterar e-mail</button></div>
 
       <section class="dash-tab active" id="tab-home">
-        <div class="panel hero-panel"><h1>Visão Geral</h1><p>Bem-vindo ao seu painel Dlinky. Aqui você tem uma visão rápida do seu perfil, análises e configurações.</p></div>
+        <div class="panel hero-panel"><h1>Visão Geral</h1><p>Bem-vindo ao seu painel LexVoid. Aqui você tem uma visão rápida do seu perfil, análises e configurações.</p></div>
         <div class="cards4"><div class="card"><span>Visualizações</span><b id="viewsCount">0</b></div><div class="card"><span>Linkwuans</span><b>0</b></div><div class="card"><span>Conta</span><b>Grátis</b></div></div>
         <div class="profile-card panel"><span class="avatar" id="dashAvatar"></span><div><h2 id="dashName">Nome</h2><p id="dashSlug">@slug</p><button class="btn primary small" id="viewProfile2">⊙ Ver Perfil</button><button class="btn dark small" data-tab="images">▧ Editar Imagens</button><button class="btn dark small" data-tab="links">🔗 Editar Links</button><button class="btn dark small" id="logoutBtn">⇱ Sair</button></div></div>
         <div class="grid2"><div class="panel"><h3>Gerenciamento de Grupos <em>BREVE</em></h3><p>Em breve você poderá criar seus próprios grupos, convidar amigos e montar comunidades.</p><div class="blocked">⚒ Este recurso ainda se encontra em construção.</div><div class="group-actions"><button>Criar Grupo</button><button>Convidar Amigos</button><button>Adicionar Imagem</button><button>Editar Descrição</button><button>Copiar Link</button></div></div><div class="panel updates"><h3>Atualizações do Painel</h3><article><b>Decorações animadas adicionadas</b><span>10/05/2026 - 08:20</span><p>Agora as molduras ficam separadas da foto, igual decoração de perfil.</p></article><article><b>Vídeo de fundo corrigido</b><span>10/05/2026 - 08:21</span><p>Use link direto terminado em .mp4 ou .webm.</p></article></div></div>
@@ -106,7 +106,7 @@
       <section class="dash-tab" id="tab-socials"><div class="panel form-panel"><h2>Ícones sociais</h2><p>Escolha quais ícones aparecem abaixo da bio. A pessoa clica no ícone e é redirecionada.</p><div id="socialEditor"></div><button class="btn dark" id="addSocial">+ Adicionar ícone</button><button class="btn primary" id="saveSocials">Salvar ícones sociais</button></div></section>
 
       <section class="dash-tab" id="tab-theme"><div class="panel form-panel"><h2>Tema, partículas e decorações</h2><label>Cor neon<input id="cfgColor" type="color" value="#a855f7"></label><label>Partículas<select id="cfgParticleType"><option value="snow">Neve brilhante</option><option value="stars">Estrelas roxas</option><option value="hearts">Corações</option>
-              <option value="cats">Gatinhos / patinhas</option><option value="embers">Fagulhas</option><option value="bubbles">Bolhas neon</option><option value="none">Sem partículas</option></select></label><label>Template pronto<select id="cfgTemplate"><option value="default">Dlinky Roxo</option><option value="anime">Anime dark card</option><option value="minimal">Minimal neon</option><option value="cyber">Cyber roxo</option></select></label><label>Decoração da foto estilo Discord<select id="cfgDecoration"><option value="none">Sem decoração</option><option value="purple-ring">Anel roxo girando</option><option value="red-ring">Anel vermelho neon</option><option value="sparkle-frame">Brilhos ao redor</option><option value="flame-frame">Chamas roxas</option><option value="orbit-frame">Órbita premium</option></select></label><label class="check"><input id="cfgVerified" type="checkbox"> Mostrar selo verificado</label><label class="check"><input id="cfgHideViews" type="checkbox"> Ocultar visualizações</label><button class="btn primary" id="saveTheme">Salvar tema</button></div></section>
+              <option value="cats">Gatinhos / patinhas</option><option value="embers">Fagulhas</option><option value="bubbles">Bolhas neon</option><option value="none">Sem partículas</option></select></label><label>Template pronto<select id="cfgTemplate"><option value="default">LexVoid Roxo</option><option value="anime">Anime dark card</option><option value="minimal">Minimal neon</option><option value="cyber">Cyber roxo</option></select></label><label>Decoração da foto estilo Discord<select id="cfgDecoration"><option value="none">Sem decoração</option><option value="purple-ring">Anel roxo girando</option><option value="red-ring">Anel vermelho neon</option><option value="sparkle-frame">Brilhos ao redor</option><option value="flame-frame">Chamas roxas</option><option value="orbit-frame">Órbita premium</option></select></label><label class="check"><input id="cfgVerified" type="checkbox"> Mostrar selo verificado</label><label class="check"><input id="cfgHideViews" type="checkbox"> Ocultar visualizações</label><button class="btn primary" id="saveTheme">Salvar tema</button></div></section>
 
       <section class="dash-tab" id="tab-assets"><div class="panel"><h2>Linky Assets</h2><p>Catálogo estilo Pinterest para usuário escolher banner, background, música e decoração pronta. Alguns itens estão marcados como Premium para você vender depois.</p><div class="asset-tabs"><button data-asset-tab="backgrounds" class="active">Backgrounds</button><button data-asset-tab="banners">Banners</button><button data-asset-tab="decorations">Decorações</button><button data-asset-tab="music">Músicas</button></div><div id="assetGrid" class="asset-grid"></div></div></section>
 
@@ -230,7 +230,7 @@
       <section class="dash-tab" id="tab-payments"><div class="panel hero-panel"><h1>Pagamentos</h1><p>Configure o Mistic Pay / PIX para receber vendas de Linkwuans e itens premium.</p></div><div class="grid2"><div class="panel form-panel"><h2>Mistic Pay / PIX</h2><label>Nome recebedor<input id="payName" placeholder="Seu nome/loja"></label><label>Chave PIX<input id="payPix" placeholder="sua chave pix"></label><label>Endpoint Mistic Pay<input id="payEndpoint" placeholder="https://api.misticpay..."></label><label>Token público/identificador<input id="payToken" placeholder="cole aqui se tiver"></label><button class="btn primary" id="savePay">Salvar Mistic Pay</button></div><div class="panel"><h2>Como fica</h2><p>Na loja, ao clicar em comprar, abre um QR Code PIX para finalizar o pedido.</p><p>Para pagamento real, use um backend para proteger token secreto.</p></div></div></section>
       <section class="dash-tab" id="tab-inventory"><div class="panel hero-panel"><h1>Inventário</h1><p>Gerencie molduras, insígnias, efeitos e presentes.</p></div><div class="cards4"><div class="card"><span>Saldo</span><b id="invCoins">0</b><small>Linkwuans</small></div><div class="card"><span>Itens</span><b id="invItemsCount">0</b></div><div class="card"><span>Presentes</span><b>0</b></div><div class="card"><span>Expirados</span><b>0</b></div></div><div class="asset-tabs" id="inventoryTabs"><button class="active" data-inv-filter="todos">Todos</button><button data-inv-filter="molduras">Molduras</button><button data-inv-filter="insignias">Insígnias</button><button data-inv-filter="efeitos">Efeitos</button><button data-inv-filter="presentes">Presentes</button><button data-inv-filter="selos">Selos</button></div><div id="inventoryGrid" class="asset-grid"></div></section>
 
-      <section class="dash-tab" id="tab-admin"><div class="panel hero-panel"><h1>Admin Dlinky</h1><p>Área privada visível apenas para o email autorizado.</p></div><div class="grid2"><div class="panel form-panel"><h2>Adicionar moldura personalizada</h2><label>Nome da moldura<input id="adminFrameName" placeholder="Moldura Borboleta Premium"></label><label>Descrição<input id="adminFrameDesc" placeholder="Linda, animada e exclusiva"></label><label>Preço base em Linkwuans<input id="adminFramePrice" placeholder="20 Linkwuans"></label><div class="admin-price-grid"><label>3 dias<input id="adminPrice3" placeholder="20"></label><label>7 dias<input id="adminPrice7" placeholder="30"></label><label>15 dias<input id="adminPrice15" placeholder="40"></label><label>Permanente<input id="adminPricePerm" placeholder="50"></label></div><label>URL/arquivo da moldura GIF/PNG/APNG<input id="adminFrameUrl" placeholder="assets/molduras/borboleta.gif ou https://site.com/frame.gif"></label><button class="btn primary" id="adminAddFrame">Adicionar na loja</button><div class="helpbox">Dica: baixe seu GIF/PNG permitido, coloque em <b>assets/molduras/</b> dentro da pasta do site e use o caminho <b>assets/molduras/nome.gif</b>.</div></div><div class="panel form-panel"><h2>Gerenciar usuário</h2><label>Email do usuário<input id="adminUserEmail" placeholder="email@exemplo.com"></label><label>Adicionar Linkwuans<input id="adminCoins" type="number" placeholder="100"></label><label>Premium por<input id="adminPremiumAmount" type="number" placeholder="30"></label><label>Tipo de tempo<select id="adminPremiumUnit"><option value="hours">Horas</option><option value="days">Dias</option><option value="months">Meses</option><option value="years">Anos</option></select></label><button class="btn primary" id="adminApplyUser">Aplicar no usuário</button></div></div><div class="grid2"><div class="panel form-panel"><h2>Enviar presente</h2><label>Email ou slug da pessoa<input id="giftEmail" placeholder="email@exemplo.com ou @slug"></label><label>Escolher item da loja<select id="giftItemSelect"><option value="">Selecione uma moldura da loja</option></select></label><label>Mensagem opcional<textarea id="giftMsg" maxlength="100" placeholder="Escreva uma mensagem para o destinatário"></textarea></label><button class="btn primary" id="adminSendGift">Enviar presente</button></div><div class="panel"><h2>Molduras cadastradas</h2><div id="adminFramesList" class="admin-list"></div></div></div></section>
+      <section class="dash-tab" id="tab-admin"><div class="panel hero-panel"><h1>Admin LexVoid</h1><p>Área privada visível apenas para o email autorizado.</p></div><div class="grid2"><div class="panel form-panel"><h2>Adicionar moldura personalizada</h2><label>Nome da moldura<input id="adminFrameName" placeholder="Moldura Borboleta Premium"></label><label>Descrição<input id="adminFrameDesc" placeholder="Linda, animada e exclusiva"></label><label>Preço base em Linkwuans<input id="adminFramePrice" placeholder="20 Linkwuans"></label><div class="admin-price-grid"><label>3 dias<input id="adminPrice3" placeholder="20"></label><label>7 dias<input id="adminPrice7" placeholder="30"></label><label>15 dias<input id="adminPrice15" placeholder="40"></label><label>Permanente<input id="adminPricePerm" placeholder="50"></label></div><label>URL/arquivo da moldura GIF/PNG/APNG<input id="adminFrameUrl" placeholder="assets/molduras/borboleta.gif ou https://site.com/frame.gif"></label><button class="btn primary" id="adminAddFrame">Adicionar na loja</button><div class="helpbox">Dica: baixe seu GIF/PNG permitido, coloque em <b>assets/molduras/</b> dentro da pasta do site e use o caminho <b>assets/molduras/nome.gif</b>.</div></div><div class="panel form-panel"><h2>Gerenciar usuário</h2><label>Email do usuário<input id="adminUserEmail" placeholder="email@exemplo.com"></label><label>Adicionar Linkwuans<input id="adminCoins" type="number" placeholder="100"></label><label>Premium por<input id="adminPremiumAmount" type="number" placeholder="30"></label><label>Tipo de tempo<select id="adminPremiumUnit"><option value="hours">Horas</option><option value="days">Dias</option><option value="months">Meses</option><option value="years">Anos</option></select></label><button class="btn primary" id="adminApplyUser">Aplicar no usuário</button></div></div><div class="grid2"><div class="panel form-panel"><h2>Enviar presente</h2><label>Email ou slug da pessoa<input id="giftEmail" placeholder="email@exemplo.com ou @slug"></label><label>Escolher item da loja<select id="giftItemSelect"><option value="">Selecione uma moldura da loja</option></select></label><label>Mensagem opcional<textarea id="giftMsg" maxlength="100" placeholder="Escreva uma mensagem para o destinatário"></textarea></label><button class="btn primary" id="adminSendGift">Enviar presente</button></div><div class="panel"><h2>Molduras cadastradas</h2><div id="adminFramesList" class="admin-list"></div></div></div></section>
 
       <section class="dash-tab" id="tab-adminSelos">
         <div class="admin-selos-grid">
@@ -341,20 +341,20 @@
   <div id="paymentModal" class="modal"><div class="modal-card"><button class="modal-close" id="closePayment">×</button><h2>Pagamento PIX</h2><p id="payDesc">Finalize a compra pelo QR Code.</p><label>Copia e cola PIX<input id="pixCode" readonly></label><button class="btn primary full" id="copyPix">Copiar código PIX</button></div></div>
 
   <section id="profile" class="page profile-page">
-    <div class="madeby">💜 Feito por Dlinky</div><button class="sound-btn" id="soundBtn">🔈</button>
+    <div class="madeby">💜 Feito por LexVoid</div><button class="sound-btn" id="soundBtn">🔈</button>
     <div class="entry-overlay" id="entryOverlay"><h1 id="welcomeText">Clique aqui</h1><span>✧</span></div>
     <video class="profile-video" id="profileVideo" autoplay muted loop playsinline preload="auto"></video><div class="profile-bg" id="profileBg"></div><div id="profileParticleLayer"></div>
     <main class="profile-wrap" id="profileCard">
       <div class="profile-banner" id="profileBanner"></div>
       <div class="avatar-decoration" id="avatarDecoration"><img class="avatar big-avatar" id="profileAvatar" alt=""><span class="decor decor-css"></span><img id="profileFrame" class="profile-frame" alt=""></div>
       <h1><span id="profileName">Usuário</span> <i id="verifiedBadge">✓</i></h1>
-      <p id="profileSlug2">@usuario</p><p class="bio" id="profileBio">Minha bio Dlinky.</p>
+      <p id="profileSlug2">@usuario</p><p class="bio" id="profileBio">Minha bio LexVoid.</p>
       <div class="profile-socials" id="profileSocials"></div><div class="profile-meta"><span id="profileViews">👁 0 views</span></div>
       <div class="profile-tags" id="profileTags"></div><div class="profile-links" id="profileLinks"></div><div class="profile-embeds" id="profileEmbeds"></div><button class="btn dark full" id="backToDash" data-goto="dashboard">Voltar ao painel</button><audio id="profileAudio" loop preload="auto"></audio>
     </main>
   </section>
 
-  <section id="simple" class="page"><header class="topbar glass smallbar"><a class="brand" href="#/"><span class="brand-icon">D</span><strong>Dlinky</strong></a></header><main class="simple-content panel"><h1 id="simpleTitle"></h1><p id="simpleText"></p><button class="btn primary" data-goto="register">Criar meu perfil</button></main></section>
+  <section id="simple" class="page"><header class="topbar glass smallbar"><a class="brand" href="#/"><span class="brand-icon">LV</span><strong>LexVoid</strong></a></header><main class="simple-content panel"><h1 id="simpleTitle"></h1><p id="simpleText"></p><button class="btn primary" data-goto="register">Criar meu perfil</button></main></section>
 <script src="app.js"></script>
 
   <div id="frameAdjustModal" class="modal frame-adjust-modal">
