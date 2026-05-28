@@ -2743,3 +2743,157 @@ loadLandingFeatured();
   document.addEventListener('DOMContentLoaded',async()=>{ mountAdminEffects(); ensureCustomClean(); fillCustomClean(); await loadAdminEffectsClean(); renderAdminEffectsClean(); });
   setTimeout(async()=>{ mountAdminEffects(); fillCustomClean(); await loadAdminEffectsClean(); renderAdminEffectsClean(); },700);
 })();
+
+/* === LEXVOID FINAL PATCH: SELLOS SHOP + ADMIN EFFECTS BANNER + INVENTORY EFFECTS (não mexe na moldura) === */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').replace(/["'<>]/g,'');
+  const toast2=t=>{try{return toast(t)}catch(e){console.log(t)}};
+  const save2=async t=>{try{return await saveUser(t)}catch(e){toast2(t||'Salvo.')}};
+  const db2=()=>{try{return firebase.firestore()}catch(e){return null}};
+  const coins=()=>Number(window.user?.coins||0);
+  const inv=()=>Array.isArray(window.user?.inventory)?window.user.inventory:(window.user.inventory=[]);
+  const norm=v=>String(v||'').trim().toLowerCase();
+  window.__lexAdminSelosShop = window.__lexAdminSelosShop || [];
+  window.__lexAdminEffectsShop = window.__lexAdminEffectsShop || [];
+
+  function setShopMode(v){
+    window.shopMode=v;
+    try{ shopMode=v; }catch(e){}
+    qa('.shop-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.shopTab===v));
+  }
+
+  function ensureShopButtons(){
+    const tabs=q('.shop-tabs'); if(!tabs) return;
+    if(!tabs.querySelector('[data-shop-tab="selos"]')){
+      const other=tabs.querySelector('[data-shop-tab="other"]');
+      const btn=document.createElement('button'); btn.type='button'; btn.dataset.shopTab='selos'; btn.textContent='Selos';
+      if(other) other.insertAdjacentElement('beforebegin',btn); else tabs.appendChild(btn);
+    }
+  }
+
+  async function loadAdminShopThings(){
+    const db=db2(); if(!db) return;
+    try{ const s=await db.collection('adminSelos').orderBy('createdAt','desc').get(); window.__lexAdminSelosShop=s.docs.map(d=>({id:d.id,...d.data()})); }catch(e){}
+    try{ const e=await db.collection('adminEffects').orderBy('createdAt','desc').get(); window.__lexAdminEffectsShop=e.docs.map(d=>({id:d.id,...d.data()})); window.__lexAdminEffectsFixed=window.__lexAdminEffectsShop; window.__lexAdminEffects=window.__lexAdminEffectsShop; }catch(e){}
+  }
+
+  function owns(kind,item){
+    const id=norm(item.id||item.itemId||item.url||item.name);
+    const url=norm(item.url||item.value);
+    const name=norm(item.name);
+    return inv().some(it=>{
+      if(kind==='selo' && !/selo|badge|seal/.test(norm(it.type))) return false;
+      if(kind==='effect' && !/effect|efeito|banner/.test(norm(it.type))) return false;
+      const vals=[it.id,it.itemId,it.url,it.value,it.name].map(norm);
+      return vals.includes(id)||vals.includes(url)||vals.includes(name)||vals.includes(kind+':'+id);
+    });
+  }
+
+  function duration(id){return `<select class="zyo-duration" data-duration-for="${esc(id)}"><option value="perm">Permanente</option><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="d30">30 dias</option></select>`;}
+  function cardSelo(s){
+    const bought=owns('selo',s), price=Number(s.price||20), id=String(s.id||s.url||s.name);
+    return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top"><div class="lex-selo-shop-preview">${s.url?`<img src="${safe(s.url)}" alt="">`:'🏷️'}</div><div><h3>${esc(s.name||'Selo')}</h3><p>${esc(s.desc||'Selo para o perfil')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${duration('selo_'+id)}<small class="zyo-note">ⓘ Use pelo inventário depois da compra.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-lex-selo="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-lex-selo="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+  function cardEffect(e){
+    const bought=owns('effect',e), price=Number(e.price||20), id=String(e.id||e.url||e.name);
+    return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top"><div class="lex-effect-shop-preview" style="background-image:url('${safe(e.url)}')"></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'Efeito para banner')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${duration('effect_'+id)}<small class="zyo-note">ⓘ Aplica no banner do perfil.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-lex-effect="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-lex-effect="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+
+  function getMode(){return window.shopMode || (typeof shopMode!=='undefined'?shopMode:'coins')}
+  const prevShop=window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){
+    ensureShopButtons();
+    const mode=getMode();
+    if(mode!=='selos' && mode!=='effects'){ if(prevShop) prevShop(); ensureShopButtons(); return; }
+    const grid=q('#shopGrid'); if(!grid) return;
+    qa('.shop-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.shopTab===mode));
+    grid.className='zyo-shop-grid';
+    if(mode==='selos'){
+      const arr=window.__lexAdminSelosShop||[];
+      grid.innerHTML=`<div class="zyo-shop-title"><h2>Selos</h2><p>Selos cadastrados pelo admin para exibir no perfil.</p></div>`+(arr.length?arr.map(cardSelo).join(''):'<p>Nenhum selo cadastrado pelo admin ainda.</p>');
+      return;
+    }
+    if(mode==='effects'){
+      const arr=window.__lexAdminEffectsShop||window.__lexAdminEffectsFixed||[];
+      grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+(arr.length?arr.map(cardEffect).join(''):'<p>Nenhum efeito cadastrado pelo admin ainda.</p>');
+    }
+  };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(e){}
+
+  const prevInv=window.renderInventory || (typeof renderInventory==='function'?renderInventory:null);
+  function invFilter(){ try{return inventoryFilter}catch(e){return q('#inventoryTabs button.active')?.dataset.invFilter||'all'} }
+  function passFilter(it){ const f=invFilter(); if(f==='all')return true; if(f==='frames')return it.type==='frame'; if(f==='effects')return /effect|efeito/.test(norm(it.type)); if(f==='selos')return /selo|badge|seal/.test(norm(it.type)); if(f==='gifts')return !!it.gift; return true; }
+  function invPreview(it){
+    if(it.type==='frame' && typeof framePreviewHtml==='function') return framePreviewHtml({url:it.url||it.value}, 'inv-preview');
+    if(/effect|efeito/.test(norm(it.type))) return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(it.url||it.value)}')"></div>`;
+    if(/selo|badge|seal/.test(norm(it.type))) return `<div class="asset-preview lex-inv-selo-preview">${it.url?`<img src="${safe(it.url)}" alt="">`:'🏷️'}</div>`;
+    return `<div class="asset-preview"><span style="display:grid;place-items:center;height:100%;font-size:36px">✦</span></div>`;
+  }
+  window.renderInventory=function(){
+    try{ if(q('#invCoins')) q('#invCoins').textContent=Number(user.coins||0); if(q('#invItemsCount')) q('#invItemsCount').textContent=inv().length; }catch(e){}
+    const grid=q('#inventoryGrid'); if(!grid){ if(prevInv) prevInv(); return; }
+    const items=inv().map((it,i)=>({it,i})).filter(x=>passFilter(x.it));
+    qa('#inventoryTabs button').forEach(b=>b.classList.toggle('active', b.dataset.invFilter===invFilter()));
+    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML=items.map(({it,i})=>`<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${invPreview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(it.type||'')}</small>${it.type==='frame'?`<button class="btn primary small" type="button" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${/effect|efeito/.test(norm(it.type))?`<button class="btn primary small" type="button" data-use-lex-effect="${i}">Usar</button>`:''}${/selo|badge|seal/.test(norm(it.type))?`<button class="btn primary small" type="button" data-use-lex-selo="${i}">Usar</button>`:''}<button class="btn dark small" type="button" data-remove-lex-profile="${i}">Remover do perfil</button></div></div>`).join('');
+  };
+  try{ if(typeof renderInventory!=='undefined') renderInventory=window.renderInventory; }catch(e){}
+
+  function findEffect(id){id=String(id); return (window.__lexAdminEffectsShop||[]).find(e=>String(e.id||e.url||e.name)===id);}
+  function findSelo(id){id=String(id); return (window.__lexAdminSelosShop||[]).find(s=>String(s.id||s.url||s.name)===id);}
+  async function buyItem(kind,id){
+    const obj=kind==='selo'?findSelo(id):findEffect(id); if(!obj) return toast2(kind==='selo'?'Selo não encontrado.':'Efeito não encontrado.');
+    if(owns(kind,obj)) return toast2('Você já comprou esse item. Use pelo inventário.');
+    const price=Number(obj.price||20); if(coins()<price) return toast2('Linkwuans insuficientes.');
+    user.coins=coins()-price; user.inventory=inv();
+    const item={id:`${kind}:${obj.id||obj.url||obj.name}`, itemId:`${kind}:${obj.id||obj.url||obj.name}`, type:kind==='selo'?'selo':'effect', name:obj.name||kind, desc:obj.desc||'', url:obj.url||'', value:obj.url||'', price, size:obj.size||32, boughtAt:Date.now()};
+    user.inventory.push(item);
+    await save2('Item comprado!'); window.renderShop(); window.renderInventory();
+  }
+  async function useEffect(i){ const it=inv()[Number(i)]; if(!it)return; user.bannerEffect=it.url||it.value||''; await save2('Efeito aplicado no banner!'); applyBannerEffect(); window.renderInventory(); }
+  async function useSelo(i){ const it=inv()[Number(i)]; if(!it)return; user.selos=Array.isArray(user.selos)?user.selos:[]; if(!user.selos.some(s=>norm(s.url)===norm(it.url)||norm(s.name)===norm(it.name))) user.selos.push({name:it.name,url:it.url,size:it.size||32}); await save2('Selo aplicado!'); try{renderProfile()}catch(e){} window.renderInventory(); }
+  async function removeProfile(i){ const it=inv()[Number(i)]; if(!it)return;
+    if(/effect|efeito/.test(norm(it.type)) && norm(user.bannerEffect)===norm(it.url||it.value)){ user.bannerEffect=''; await save2('Efeito removido do perfil. Continua no inventário.'); applyBannerEffect(); }
+    else if(/selo|badge|seal/.test(norm(it.type))){ user.selos=(user.selos||[]).filter(s=>!(norm(s.url)===norm(it.url)||norm(s.name)===norm(it.name))); await save2('Selo removido do perfil. Continua no inventário.'); try{renderProfile()}catch(e){} }
+    else toast2('Esse item continua no inventário.');
+    window.renderInventory();
+  }
+
+  function applyBannerEffect(){
+    const banner=q('#profileBanner'); if(!banner) return;
+    let fx=banner.querySelector('.lex-banner-effect-layer');
+    if(!fx){fx=document.createElement('span'); fx.className='lex-banner-effect-layer'; banner.appendChild(fx);}
+    if(user.bannerEffect){ fx.style.backgroundImage=`url('${safe(user.bannerEffect)}')`; fx.style.display='block'; }
+    else fx.style.display='none';
+  }
+  const prevProfile=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){ if(prevProfile) prevProfile(); applyBannerEffect(); };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  document.addEventListener('click',async e=>{
+    const st=e.target.closest('[data-shop-tab]'); if(st){ setShopMode(st.dataset.shopTab); setTimeout(()=>window.renderShop(),0); }
+    const be=e.target.closest('[data-buy-lex-effect]'); if(be){ e.preventDefault(); e.stopPropagation(); return buyItem('effect',be.dataset.buyLexEffect); }
+    const bs=e.target.closest('[data-buy-lex-selo]'); if(bs){ e.preventDefault(); e.stopPropagation(); return buyItem('selo',bs.dataset.buyLexSelo); }
+    const ue=e.target.closest('[data-use-lex-effect]'); if(ue){ e.preventDefault(); e.stopPropagation(); return useEffect(ue.dataset.useLexEffect); }
+    const us=e.target.closest('[data-use-lex-selo]'); if(us){ e.preventDefault(); e.stopPropagation(); return useSelo(us.dataset.useLexSelo); }
+    const rp=e.target.closest('[data-remove-lex-profile]'); if(rp){ e.preventDefault(); e.stopPropagation(); return removeProfile(rp.dataset.removeLexProfile); }
+    if(e.target.closest('[data-gift-lex-selo],[data-gift-lex-effect]')){ e.preventDefault(); toast2('Presentear será liberado pelo admin.'); }
+  },true);
+
+  function fixAdminEffectsBox(){
+    const tab=q('#tab-adminEffects'); if(!tab) return;
+    tab.classList.add('lex-admin-effects-good');
+    const grid=tab.querySelector('.grid2'); if(grid) grid.classList.add('lex-admin-effects-grid-good');
+    const list=q('#adminEffectsList'); if(list) list.classList.add('lex-admin-effects-list-good');
+  }
+  const oldAdm=window.renderAdminEffects || window.renderAdminEffectsFinal;
+  window.renderAdminEffects=function(){ if(typeof oldAdm==='function') oldAdm(); fixAdminEffectsBox(); };
+  window.renderAdminEffectsFinal=window.renderAdminEffects;
+
+  async function boot(){ ensureShopButtons(); fixAdminEffectsBox(); await loadAdminShopThings(); try{window.renderAdminEffects()}catch(e){} if(q('#shopGrid')) window.renderShop(); if(q('#inventoryGrid')) window.renderInventory(); applyBannerEffect(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  setTimeout(boot,900);
+})();
