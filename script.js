@@ -3205,108 +3205,110 @@ loadLandingFeatured();
   setTimeout(boot, 1500);
 })();
 
-/* === LEXVOID FINAL HOTFIX: botão voltar só dono + créditos TikTok + selos sincronizados com admin === */
+/* ===== LEXVOID SAFE HOTFIX — voltar só dono, TikTok, selos sem quebrar molduras ===== */
 (function(){
   const TIKTOK_URL = 'https://www.tiktok.com/@stermylovee?_r=1&_t=ZS-96T7TI02xNc';
-  const q = (s,r=document)=>r.querySelector(s);
-  const qa = (s,r=document)=>Array.from(r.querySelectorAll(s));
-  const norm = v => String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9:/._-]+/g,'');
-  const dbx = () => { try { return firebase.firestore(); } catch(e) { return null; } };
-  const inv = () => Array.isArray(window.user?.inventory) ? window.user.inventory : (window.user ? (window.user.inventory=[]) : []);
-  const save = async () => { try { if(typeof saveUser === 'function') await saveUser('Inventário atualizado.'); } catch(e){} };
-  let adminSelosLive = [];
-  let syncDone = false;
-
-  function fixCredits(){
-    qa('.madeby,.dlinky-hud-credit,.lex-credit-link').forEach(el=>{
-      if(el.tagName !== 'A'){
-        const a=document.createElement('a');
-        a.className = (el.className||'') + ' lex-credit-link';
-        a.href=TIKTOK_URL; a.target='_blank'; a.rel='noopener';
-        a.innerHTML=el.innerHTML || '💜 Feito por LexVoid';
-        el.replaceWith(a);
-      }else{
-        el.href=TIKTOK_URL; el.target='_blank'; el.rel='noopener';
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'').trim();
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').replace(/"/g,'%22');
+  function inv(){ return Array.isArray(window.user?.inventory) ? window.user.inventory : []; }
+  function typeOf(it){ const t=norm(it?.type); if(t.includes('frame')||t.includes('moldura')) return 'frame'; if(t.includes('effect')||t.includes('efeito')||t.includes('banner')) return 'effect'; if(t.includes('selo')||t.includes('seal')) return 'selo'; if(t.includes('badge')||t.includes('insign')) return 'badge'; return t||'other'; }
+  function keys(o){ return [o?.id,o?.itemId,o?.seloId,o?.url,o?.value,o?.name].map(norm).filter(Boolean); }
+  function same(a,b){ const ak=keys(a), bk=keys(b); return ak.some(x=>bk.includes(x) || bk.includes(x.replace(/^selo:/,'')) || ak.includes('selo:'+x)); }
+  async function refreshAdminSelos(){
+    try{
+      if(window.db && typeof window.db.collection==='function'){
+        const snap = await window.db.collection('adminSelos').orderBy('createdAt','desc').get();
+        window.__lexAdminSelosStrict = snap.docs.map(d=>({id:d.id,...d.data()}));
+        window.__lexAdminSelosShop = window.__lexAdminSelosStrict;
+        window.adminSelos = window.__lexAdminSelosStrict;
       }
-    });
-  }
-
-  function isOwner(){
-    try{
-      const au = firebase.auth().currentUser;
-      if(!au || !window.user) return false;
-      return (user.uid && au.uid === user.uid) || (user.email && au.email && String(user.email).toLowerCase() === String(au.email).toLowerCase());
-    }catch(e){ return false; }
-  }
-  function fixBackButton(){
-    const btn = q('#backToDash');
-    if(!btn) return;
-    const owner = isOwner();
-    btn.style.display = owner ? '' : 'none';
-    btn.hidden = !owner;
-  }
-
-  function adminSeloKeys(){
-    return adminSelosLive.flatMap(s=>[s.id,s.itemId,s.seloId,s.url,s.value,s.name].map(norm)).filter(Boolean);
-  }
-  function isSelo(it){ const t=norm(it?.type); return t==='selo' || t==='seal'; }
-  function seloStillExists(it){
-    if(!isSelo(it)) return true;
-    const keys = adminSeloKeys();
-    if(!keys.length) return false;
-    const vals=[it.id,it.itemId,it.seloId,it.url,it.value,it.name].map(norm).filter(Boolean);
-    return vals.some(v => keys.includes(v) || keys.includes(v.replace(/^selo:/,'')) || vals.includes('selo:'+v));
-  }
-  async function loadSelos(){
-    const db = dbx();
-    if(!db) return;
-    try{
-      const snap = await db.collection('adminSelos').get();
-      adminSelosLive = snap.docs.map(d=>({id:d.id, ...d.data()}));
-      window.__lexAdminSelosStrict = adminSelosLive;
-      window.__lexAdminSelosShop = adminSelosLive;
     }catch(e){}
   }
-  async function syncDeletedSelos(){
-    if(!window.user) return;
-    await loadSelos();
-    const before = inv().length;
-    const kept = inv().filter(seloStillExists);
-    if(kept.length !== before){
-      window.user.inventory = kept;
-      if(Array.isArray(window.user.selos)) window.user.selos = window.user.selos.filter(seloStillExists);
-      await save();
-    }
-    syncDone = true;
-  }
-
-  const oldRenderInventory = window.renderInventory;
-  window.renderInventory = async function(){
-    if(!syncDone) await syncDeletedSelos();
-    if(typeof oldRenderInventory === 'function') oldRenderInventory.apply(this, arguments);
+  function adminSelos(){ return Array.isArray(window.__lexAdminSelosStrict) ? window.__lexAdminSelosStrict : (Array.isArray(window.adminSelos)?window.adminSelos:[]); }
+  function validSeloItem(it){ const list=adminSelos(); if(typeOf(it)!=='selo') return true; return list.length ? list.some(s=>same(it,s)) : false; }
+  function currentFilter(){ const active=q('#inventoryTabs button.active'); return active?.dataset.invFilter || active?.dataset.filter || window.inventoryFilter || 'todos'; }
+  function passFilter(it){ const f=norm(currentFilter()), t=typeOf(it); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return t==='frame'; if(['efeitos','effects','effect'].includes(f)) return t==='effect'; if(['selos','selo'].includes(f)) return t==='selo'; if(['insignias','insignias','badge','badges'].includes(f)) return t==='badge'; if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
+  function getAvatar(){ try{ return (typeof getBestAvatar==='function' && getBestAvatar()) || window.user?.avatar || ''; }catch(e){ return window.user?.avatar || ''; } }
+  function framePreview(it){ const av=getAvatar(); const u=it?.url||it?.value||''; return `<div class="lex-shop-frame-preview"><span class="lex-shop-avatar" style="background-image:url('${safe(av)}')"></span>${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:''}</div>`; }
+  function effectPreview(it){ const u=it?.url||it?.value||''; return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(u)}')"></div>`; }
+  function seloPreview(it){ const u=it?.url||it?.value||''; return `<div class="asset-preview lex-inv-selo-preview">${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:'🏷️'}</div>`; }
+  function preview(it){ const t=typeOf(it); if(t==='frame') return framePreview(it); if(t==='effect') return effectPreview(it); if(t==='selo') return seloPreview(it); return '<div class="asset-preview">✦</div>'; }
+  window.renderInventory = function(){
+    const grid=q('#inventoryGrid'); if(!grid) return;
+    if(q('#invCoins')) q('#invCoins').textContent = Number(window.user?.coins||0);
+    const all = inv().filter(validSeloItem); // não remove molduras/efeitos por engano; só esconde selos apagados do admin
+    if(q('#invItemsCount')) q('#invItemsCount').textContent = all.length;
+    qa('#inventoryTabs button').forEach(b=>b.classList.toggle('active', norm(b.dataset.invFilter||b.dataset.filter)===norm(currentFilter())));
+    const items = all.map(it=>({it,i:inv().indexOf(it)})).filter(x=>passFilter(x.it));
+    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML = items.map(({it,i})=>{
+      const t=typeOf(it);
+      return `<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${preview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(t)}</small>${t==='frame'?`<button class="btn primary small" type="button" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${t==='effect'?`<button class="btn primary small" type="button" data-use-lex2-effect="${i}">Usar</button>`:''}${t==='selo'?`<button class="btn primary small" type="button" data-use-lex2-selo="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-lex2-selo="${i}">Ajustar</button>`:''}<button class="btn dark small" type="button" data-remove-lex2-profile="${i}">Remover do perfil</button></div></div>`;
+    }).join('');
   };
   try{ renderInventory = window.renderInventory; }catch(e){}
 
-  const oldRenderProfile = window.renderProfile;
+  function isOwner(){
+    try{
+      const au = window.currentAuthUser || (window.firebase?.auth && window.firebase.auth().currentUser) || null;
+      if(!au || !window.user) return false;
+      return (!!window.user.uid && au.uid === window.user.uid) || (!!window.user.email && String(au.email||'').toLowerCase() === String(window.user.email||'').toLowerCase());
+    }catch(e){ return false; }
+  }
+  function fixOwnerButton(){
+    const btn=q('#backToDash'); if(!btn) return;
+    const own=isOwner();
+    btn.style.display = own ? '' : 'none';
+    btn.setAttribute('aria-hidden', own ? 'false' : 'true');
+  }
+  const oldRenderProfile = window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
   window.renderProfile = function(){
-    if(typeof oldRenderProfile === 'function') oldRenderProfile.apply(this, arguments);
-    fixBackButton();
-    fixCredits();
+    if(typeof oldRenderProfile==='function') oldRenderProfile();
+    const list=adminSelos();
+    if(Array.isArray(window.user?.selos) && list.length){
+      window.user.selos = window.user.selos.filter(s=>list.some(a=>same(s,a)));
+      const box=q('#profileSelos');
+      if(box) box.innerHTML = window.user.selos.map(s=>`<img title="${esc(s.name||'Selo')}" src="${safe(s.url||s.value||'')}" style="width:${Number(s.size||32)}px;height:${Number(s.size||32)}px">`).join('');
+    }
+    fixOwnerButton();
   };
   try{ renderProfile = window.renderProfile; }catch(e){}
 
-  document.addEventListener('click', e=>{
-    const credit = e.target.closest('.madeby,.dlinky-hud-credit,.lex-credit-link');
-    if(credit){ credit.setAttribute('href', TIKTOK_URL); credit.setAttribute('target','_blank'); }
-  }, true);
-
-  async function boot(){
-    fixCredits();
-    fixBackButton();
-    await syncDeletedSelos();
-    try{ if(q('#inventoryGrid')) await window.renderInventory(); }catch(e){}
-    try{ if(q('#profileCard')) window.renderProfile(); }catch(e){}
+  function setupCreditLink(){
+    qa('.dlinky-hud-credit,.madeby').forEach(el=>{
+      el.style.cursor='pointer';
+      el.title='Abrir TikTok do LexVoid';
+      if(!el.dataset.lexTiktok){
+        el.dataset.lexTiktok='1';
+        el.addEventListener('click',ev=>{ ev.preventDefault(); window.open(TIKTOK_URL,'_blank','noopener'); });
+      }
+    });
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  document.addEventListener('click', async e=>{
+    const b=e.target.closest('[data-use-lex2-selo]');
+    if(b){
+      const it=inv()[Number(b.dataset.useLex2Selo)]; if(!it) return;
+      window.user.selos = Array.isArray(window.user.selos)?window.user.selos:[];
+      const list=window.user.selos.filter(s=>!same(s,it));
+      list.push({id:it.id||it.itemId||'', itemId:it.itemId||it.id||'', name:it.name||'Selo', url:it.url||it.value||'', value:it.url||it.value||'', size:it.size||32});
+      window.user.selos=list;
+      if(typeof saveUser==='function') await saveUser('Selo aplicado!');
+      try{ window.renderInventory(); window.renderProfile(); }catch(_e){}
+    }
+    const r=e.target.closest('[data-remove-lex2-profile]');
+    if(r){
+      const it=inv()[Number(r.dataset.removeLex2Profile)];
+      if(it && typeOf(it)==='selo'){
+        window.user.selos=(Array.isArray(window.user.selos)?window.user.selos:[]).filter(s=>!same(s,it));
+        if(typeof saveUser==='function') await saveUser('Selo removido do perfil. Ele continua no inventário.');
+        try{ window.renderInventory(); window.renderProfile(); }catch(_e){}
+      }
+    }
+  }, true);
+  async function boot(){ setupCreditLink(); await refreshAdminSelos(); fixOwnerButton(); try{ window.renderInventory(); }catch(e){} try{ window.renderProfile(); }catch(e){} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   setTimeout(boot, 1200);
 })();
