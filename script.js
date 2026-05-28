@@ -2251,3 +2251,132 @@ loadLandingFeatured();
 
   document.addEventListener('DOMContentLoaded',async()=>{ q('[data-tab="payments"]')?.remove(); await loadEffects(); renderAdminEffects(); patchRenderDashValues(); });
 })();
+
+/* === LEXVOID FINAL HOTFIX: frame adjust, particles, effects, landing polish === */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s), qa=(s,r=document)=>[...r.querySelectorAll(s)];
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').replace(/["'<>]/g,'');
+  function toastX(t){ try{ if(typeof toast==='function') return toast(t); }catch(e){} const el=q('#toast'); if(el){el.textContent=t;el.className='show';setTimeout(()=>el.className='',1800);} }
+  function saveX(msg){ try{return Promise.resolve(saveUser(msg));}catch(e){return Promise.resolve();} }
+  function avatarUrl(){return (window.user&&user.avatar)||'';}
+  function frameUrl(){return (window.user&&user.frame)||'';}
+  function fa(){ user.frameAdjust=Object.assign({x:0,y:0,scale:1,rotate:0},user.frameAdjust||{}); return user.frameAdjust; }
+  function setFrameVars(el, a){ if(!el) return; a=a||fa(); el.style.setProperty('--frame-x',(Number(a.x)||0)+'px'); el.style.setProperty('--frame-y',(Number(a.y)||0)+'px'); el.style.setProperty('--frame-scale',Number(a.scale||1)); el.style.setProperty('--frame-rotate',(Number(a.rotate)||0)+'deg'); el.classList.add('lex-frame-adjusted','manual-adjusted'); }
+
+  // A moldura agora é ajustada por variáveis CSS, sem conflito com transform inline antigo.
+  window.updateAdjustPreview=function(){
+    const a={x:Number(q('#adjustX')?.value||0),y:Number(q('#adjustY')?.value||0),scale:Number(q('#adjustScale')?.value||100)/100,rotate:Number(q('#adjustRotate')?.value||0)};
+    setFrameVars(q('#adjustFrame'),a); setFrameVars(q('#adjustFrameFinal'),a);
+    const label=q('#adjustLiveValues'); if(label) label.textContent=`X ${a.x}px · Y ${a.y}px · ${Math.round(a.scale*100)}% · ${a.rotate}°`;
+  };
+  window.openFrameAdjust=function(){
+    if(!frameUrl()) return toastX('Use uma moldura primeiro.');
+    const m=q('#frameAdjustModal'); if(!m) return;
+    let preview=m.querySelector('.adjust-preview');
+    if(preview && !q('#adjustLiveValues')) preview.insertAdjacentHTML('afterend','<small id="adjustLiveValues" class="adjust-live-values"></small>');
+    const a=fa();
+    q('#adjustX').value=Number(a.x||0); q('#adjustY').value=Number(a.y||0); q('#adjustScale').value=Math.round(Number(a.scale||1)*100); q('#adjustRotate').value=Number(a.rotate||0);
+    const av=q('#adjustAvatar'); if(av){ av.style.backgroundImage=avatarUrl()?`url("${safe(avatarUrl())}")`:''; av.style.backgroundSize='cover'; av.style.backgroundPosition='center'; av.style.display='block'; }
+    const fr=q('#adjustFrame'); if(fr){ fr.src=frameUrl(); fr.style.display='block'; fr.removeAttribute('style'); fr.src=frameUrl(); setFrameVars(fr,a); }
+    m.classList.add('show','real-centered-modal','dlinky-clean-adjust','lex-adjust-v4');
+    window.updateAdjustPreview();
+  };
+  window.saveFrameAdjust=async function(){
+    user.frameAdjust={x:Number(q('#adjustX')?.value||0),y:Number(q('#adjustY')?.value||0),scale:Number(q('#adjustScale')?.value||100)/100,rotate:Number(q('#adjustRotate')?.value||0)};
+    q('#frameAdjustModal')?.classList.remove('show','real-centered-modal','dlinky-clean-adjust','lex-adjust-v4');
+    const pf=q('#profileFrame'); if(pf) setFrameVars(pf,user.frameAdjust);
+    await saveX('Ajuste da moldura salvo!');
+  };
+  ['adjustX','adjustY','adjustScale','adjustRotate'].forEach(id=>{ const el=q('#'+id); if(el && !el.dataset.lexFinal){ el.dataset.lexFinal='1'; el.addEventListener('input',window.updateAdjustPreview); }});
+  q('#resetFrameAdjust')?.addEventListener('click',e=>{q('#adjustX').value=0;q('#adjustY').value=0;q('#adjustScale').value=100;q('#adjustRotate').value=0;window.updateAdjustPreview();},true);
+
+  // Render do perfil aplica ajuste salvo e efeitos corretos.
+  const oldRenderProfile=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){
+    if(oldRenderProfile) oldRenderProfile();
+    const pf=q('#profileFrame'); if(pf && frameUrl()){ pf.src=frameUrl(); pf.style.display='block'; setFrameVars(pf,fa()); }
+    applyProfileLayoutAndFx();
+    createProfileParticles(user.particleType||'none');
+  };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  function applyProfileLayoutAndFx(){
+    const card=q('#profileCard'), banner=q('#profileBanner'), avatar=q('#profileAvatar'), name=q('#profileName'); if(!card) return;
+    const fx=user.nameFx||{}; const glow=user.fxGlowColor||'#8b5cf6';
+    card.classList.toggle('fx-glow-card',!!fx.glowCard); card.classList.toggle('fx-pulse-card',!!fx.pulseCard); card.classList.toggle('fx-border-run',!!fx.borderRun); card.classList.toggle('fx-float-card',!!fx.floatCard);
+    card.style.setProperty('--user-glow',glow); card.style.setProperty('--card-alpha',String(user.cardOpacity??0.72)); card.style.setProperty('--card-blur',(user.cardBlur??14)+'px');
+    if(name){ name.classList.toggle('fx-neon-name',!!fx.neon); name.classList.toggle('fx-shine-name',!!fx.shine); name.classList.toggle('fx-rainbow-name',!!fx.rainbow); name.style.setProperty('--user-glow',glow); }
+    if(banner){ banner.style.opacity=String(user.bannerOpacity??1); banner.classList.toggle('fx-banner-shine',!!fx.bannerShine); }
+    if(avatar){ avatar.classList.toggle('fx-avatar-pulse',!!fx.avatarPulse); }
+    card.classList.remove('layout-icon-only','layout-banner-only','avatar-square','avatar-rounded','avatar-triangle');
+    card.classList.add('layout-'+(user.profileLayout||'full'));
+    card.classList.add('avatar-'+(user.avatarShape||'round'));
+    if(fx.perspective){
+      card.onmousemove=(ev)=>{const r=card.getBoundingClientRect(); const px=(ev.clientX-r.left)/r.width; const py=(ev.clientY-r.top)/r.height; const ry=(px-.5)*16; const rx=(.5-py)*16; card.style.transform=`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;};
+      card.onmouseleave=()=>{card.style.transform='';};
+    } else { card.onmousemove=null; card.onmouseleave=null; card.style.transform=''; }
+  }
+
+  // Partículas reais caindo; remove floco fixo e recria só no perfil depois do clique.
+  window.createProfileParticles=function(type){
+    const layer=q('#profileParticleLayer'); if(!layer) return; layer.innerHTML='';
+    if(!window.user || type==='none' || !user.particles) return;
+    const overlay=q('#entryOverlay'); if(overlay && !overlay.classList.contains('hidden')) return;
+    const sets={
+      snow:['❄','❅','❆'], raios:['⚡','ϟ'], stars:['✦','✧','✩'], hearts:['❤','♥'], bubbles:[''], rain:['╱','│'], fire:['🔥','•'], leaves:['🍃','🍂'], matrix:['0','1'], cats:['🐾','✦']
+    };
+    const chars=sets[type]||sets.stars;
+    const count=Math.max(10,Math.min(180,Number(user.particleCount||45)));
+    const speed=Math.max(1,Math.min(10,Number(user.particleSpeed||5)));
+    const sizeMap={small:[9,15],medium:[14,24],large:[22,38]}; const sz=sizeMap[user.particleSize||'small']||sizeMap.small;
+    layer.className='lex-particle-layer';
+    for(let i=0;i<count;i++){
+      const el=document.createElement('span'); const ch=chars[Math.floor(Math.random()*chars.length)]; el.textContent=ch; el.className='lex-fall-particle lex-p-'+type;
+      const size=sz[0]+Math.random()*(sz[1]-sz[0]);
+      el.style.left=(Math.random()*100)+'vw'; el.style.fontSize=size+'px'; el.style.setProperty('--drift',((Math.random()*100)-50)+'px'); el.style.animationDuration=(Math.max(5,20-speed*1.35)+Math.random()*8)+'s'; el.style.animationDelay=(-Math.random()*18)+'s';
+      if(type==='bubbles'){el.style.width=size+'px';el.style.height=size+'px';}
+      layer.appendChild(el);
+    }
+  };
+  try{ if(typeof createProfileParticles!=='undefined') createProfileParticles=window.createProfileParticles; }catch(e){}
+  q('#entryOverlay')?.addEventListener('click',()=>setTimeout(()=>window.createProfileParticles(user.particleType||'none'),120));
+
+  // Customização: checkboxes podem ativar/desativar; adiciona layout/forma; salva exatamente o estado atual.
+  function ensureCustomControls(){
+    const holder=q('#customBgFx')?.parentElement; if(holder && !q('#profileLayoutMode')){
+      holder.insertAdjacentHTML('afterend',`<label>Layout do perfil<select id="profileLayoutMode"><option value="full">Card completo</option><option value="icon-only">Só ícone no centro</option><option value="banner-only">Banner + ícone</option></select></label><label>Formato do avatar<select id="avatarShape"><option value="round">Redondo</option><option value="square">Quadrado</option><option value="rounded">Retangular arredondado</option><option value="triangle">Triângulo</option></select></label>`);
+    }
+  }
+  function fillCustomControls(){ ensureCustomControls(); const fx=user.nameFx||{}; const map={fxNeonName:'neon',fxShineName:'shine',fxRainbowName:'rainbow',fxPerspective:'perspective',fxGlowCard:'glowCard',fxPulseCard:'pulseCard',fxBorderRun:'borderRun',fxFloatCard:'floatCard',fxAvatarPulse:'avatarPulse',fxBannerShine:'bannerShine'}; Object.entries(map).forEach(([id,prop])=>{const el=q('#'+id); if(el) el.checked=!!fx[prop];}); if(q('#fxGlowColor')) q('#fxGlowColor').value=user.fxGlowColor||'#8b5cf6'; if(q('#fxCardOpacity')) q('#fxCardOpacity').value=Math.round((user.cardOpacity??0.72)*100); if(q('#fxCardBlur')) q('#fxCardBlur').value=user.cardBlur??14; if(q('#fxBannerOpacity')) q('#fxBannerOpacity').value=Math.round((user.bannerOpacity??1)*100); if(q('#profileLayoutMode')) q('#profileLayoutMode').value=user.profileLayout||'full'; if(q('#avatarShape')) q('#avatarShape').value=user.avatarShape||'round'; }
+  const oldDash=window.renderDash || (typeof renderDash==='function'?renderDash:null);
+  window.renderDash=function(){ if(oldDash) oldDash(); fillCustomControls(); fixAdminEffectsLayout(); };
+  try{ if(typeof renderDash!=='undefined') renderDash=window.renderDash; }catch(e){}
+  function saveCustomFinal(e){
+    e.preventDefault(); e.stopImmediatePropagation(); ensureCustomControls();
+    user.name=q('#customName')?.value.trim()||user.name; user.bio=q('#customBio')?.value||''; user.bgFx=q('#customBgFx')?.value||'none';
+    user.fxGlowColor=q('#fxGlowColor')?.value||'#8b5cf6'; user.cardOpacity=Number(q('#fxCardOpacity')?.value||72)/100; user.cardBlur=Number(q('#fxCardBlur')?.value||14); user.bannerOpacity=Number(q('#fxBannerOpacity')?.value||100)/100;
+    user.profileLayout=q('#profileLayoutMode')?.value||'full'; user.avatarShape=q('#avatarShape')?.value||'round';
+    user.nameFx={neon:!!q('#fxNeonName')?.checked, shine:!!q('#fxShineName')?.checked, rainbow:!!q('#fxRainbowName')?.checked, perspective:!!q('#fxPerspective')?.checked, glowCard:!!q('#fxGlowCard')?.checked, pulseCard:!!q('#fxPulseCard')?.checked, borderRun:!!q('#fxBorderRun')?.checked, floatCard:!!q('#fxFloatCard')?.checked, avatarPulse:!!q('#fxAvatarPulse')?.checked, bannerShine:!!q('#fxBannerShine')?.checked};
+    saveX('Customização salva!').then(()=>{fillCustomControls();});
+  }
+  document.addEventListener('click',e=>{ if(e.target&&e.target.id==='saveCustom') return saveCustomFinal(e); },true);
+
+  // Admin efeitos responsivo e loja efeitos sem previews quebrados.
+  function fixAdminEffectsLayout(){ const tab=q('#tab-adminEffects'); if(tab) tab.classList.add('lex-admin-effects-fixed'); }
+  const oldRenderAdminEffects=window.renderAdminEffects;
+  window.renderAdminEffects=function(){ if(oldRenderAdminEffects) oldRenderAdminEffects(); fixAdminEffectsLayout(); const list=q('#adminEffectsList'); if(list&&!list.innerHTML.trim()) list.innerHTML='<p>Nenhum efeito cadastrado.</p>'; };
+  function shopEffectCardFinal(e){ const id=String(e.id||e.url||e.name||'effect'); const bought=(user.inventory||[]).some(it=>String(it.id||it.itemId)===('effect:'+id)); const price=Number(e.price||20); const bg=e.url?` style="background-image:url('${safe(e.url)}')"`:''; return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top"><div class="zyo-effect-banner-preview"${bg}><span>✦</span></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'Efeito de banner')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div><select class="duration-select"><option>Permanente</option><option>3 dias</option><option>15 dias</option><option>30 dias</option></select><small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-admin-effect="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-effect="${esc(id)}">🎁 Presentear</button></div></div>`; }
+  const oldShop=window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){ if(oldShop) oldShop(); const grid=q('#shopGrid'); if(!grid) return; if(window.shopMode==='effects'){ grid.className='zyo-shop-grid lex-effects-shop'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+(window.adminEffects||[]).map(shopEffectCardFinal).join(''); if(!(window.adminEffects||[]).length) grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Nenhum efeito cadastrado pelo admin ainda.</p></div>`; } if(window.shopMode==='other'){ grid.innerHTML=`<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>`; } };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(e){}
+
+  // Inventário: avatar maior nos cards.
+  const oldInv=window.renderInventory || (typeof renderInventory==='function'?renderInventory:null);
+  window.renderInventory=function(){ if(oldInv) oldInv(); qa('#inventoryGrid .asset-card').forEach(c=>c.classList.add('lex-inv-bigger')); };
+  try{ if(typeof renderInventory!=='undefined') renderInventory=window.renderInventory; }catch(e){}
+
+  // Landing premium/footer básico com animação, sem mexer no login/auth.
+  function ensureLandingExtras(){ const landing=q('#landing .hero')||q('#landing'); if(!landing || q('#lexLandingPremium')) return; landing.insertAdjacentHTML('beforeend',`<section id="lexLandingPremium" class="lex-landing-extra"><div class="lex-reveal"><span>✦ Valores Premium</span><h2>Premium LexVoid</h2><p>Desbloqueie molduras premium, neon, badge, favicon, álbum de fotos e remoção da marca.</p><div class="lex-premium-cards"><article><b>Mensal</b><strong>R$ 9,99</strong><small>Duração: 1 mês</small></article><article class="hot"><b>Anual</b><strong>R$ 89,99</strong><small>Duração: 12 meses</small></article></div></div><footer class="lex-footer"><b>LexVoid</b><div><a href="#">Discord</a><a href="#">TikTok</a></div><small>© 2026 LexVoid. Powered by LexVoid.</small></footer></section>`); const io=new IntersectionObserver(es=>es.forEach(x=>x.isIntersecting&&x.target.classList.add('show')),{threshold:.15}); qa('.lex-reveal').forEach(el=>io.observe(el)); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensureLandingExtras); else ensureLandingExtras();
+})();
