@@ -2094,3 +2094,160 @@ loadLandingFeatured();
   try{ if(typeof renderInventory!=='undefined') renderInventory=window.renderInventory; }catch(e){}
   setTimeout(polishShopAndInventory,600);
 })();
+
+/* ===== LEXVOID FINAL REQUEST PATCH — custom/effects/store/admin/frame/landing ===== */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s), qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').replace(/"/g,'%22');
+  let adminEffects=[];
+  function cleanArr(a){return Array.isArray(a)?a:[]}
+  function currentUid(){try{return firebase.auth().currentUser?.uid||''}catch(e){return ''}}
+  function dbx(){try{return firebase.firestore()}catch(e){return null}}
+  function isAdminX(){try{return typeof isAdmin==='function'?isAdmin():false}catch(e){return false}}
+  function itemKey(it){return String(it?.id||it?.itemId||it?.url||it?.value||it?.name||'').toLowerCase().trim()}
+  function hasItem(id){id=String(id||'').toLowerCase();return cleanArr(user.inventory).some(it=>itemKey(it)===id || String(it.itemId||'').toLowerCase()===id)}
+  function priceFor(item, sel){
+    const prices=item.prices||{}; if(sel==='perm') return Number(prices.perm||item.price||0); if(sel==='d15') return Number(prices.d15||item.price||0); if(sel==='d7') return Number(prices.d7||item.price||0); return Number(prices.d3||item.price||0);
+  }
+  function durationSelectHtml2(id){return `<select class="zyo-duration" data-duration-for="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="perm">Permanente</option></select>`}
+  function previewFrame(url, cls='zyo-frame-preview'){
+    return `<div class="${cls}"><span class="shop-avatar" style="background-image:${user.avatar?`url('${safe(user.avatar)}')`:'none'}"></span>${url?`<img src="${safe(url)}" alt="">`:''}</div>`
+  }
+  function renderAdminEffects(){
+    const list=q('#adminEffectsList'); if(!list) return;
+    list.innerHTML = adminEffects.map(e=>`<div class="admin-item"><div class="mini-effect-preview" style="background-image:url('${safe(e.url||'')}')"></div><div><b>${esc(e.name||'Efeito')}</b><small>${esc(e.desc||'')}</small><small>Preço: ${Number(e.price||0)} Linkwuans</small></div><button class="delete" type="button" data-admin-del-effect="${esc(e.id)}">×</button></div>`).join('') || '<p>Nenhum efeito cadastrado.</p>';
+  }
+  async function loadEffects(){
+    const db=dbx(); if(!db) return;
+    try{const snap=await db.collection('adminEffects').orderBy('createdAt','desc').get(); adminEffects=snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){adminEffects=[];}
+  }
+  const oldLoad=window.loadAdminData || (typeof loadAdminData==='function'?loadAdminData:null);
+  window.loadAdminData=async function(){ if(oldLoad) await oldLoad(); await loadEffects(); renderAdminEffects(); };
+  try{ if(typeof loadAdminData!=='undefined') loadAdminData=window.loadAdminData; }catch(e){}
+
+  function shopFrameCard2(f){
+    const id=String(f.id||f.url||f.name||'frame'); const bought=hasItem(id); const price=Number(f.price||f.prices?.perm||0);
+    return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top">${previewFrame(f.url||'')}<div><h3>${esc(f.name||'Moldura')}</h3><p>${esc(f.desc||'')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${durationSelectHtml2('frame_'+id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-frame="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-frame="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+  function shopEffectCard(e){
+    const id=String(e.id||e.url||e.name||'effect'); const bought=hasItem('effect:'+id); const price=Number(e.price||20);
+    return `<div class="zyo-item-card ${bought?'owned':''}"><div class="zyo-item-top"><div class="zyo-effect-banner-preview" style="background-image:url('${safe(e.url||'')}')"><span></span></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'Efeito de banner')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b>${price} Linkwuans</b></div>${durationSelectHtml2('effect_'+id)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-admin-effect="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-effect="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+  const oldShop = window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){
+    const grid=q('#shopGrid'); if(!grid){ if(oldShop) oldShop(); return; }
+    q('#walletCoins') && (q('#walletCoins').textContent=Number(user.coins||0)); q('#invCountMini')&&(q('#invCountMini').textContent=cleanArr(user.inventory).length);
+    qa('.shop-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.shopTab===shopMode));
+    if(shopMode==='coins'){ if(oldShop) oldShop(); return; }
+    grid.className='zyo-shop-grid';
+    if(shopMode==='frames'){
+      grid.innerHTML = `<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras cadastradas pelo admin.</p></div>` + (customFrames||[]).map(shopFrameCard2).join('') || '<p>Nenhuma moldura cadastrada.</p>';
+      if(!(customFrames||[]).length) grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Nenhuma moldura cadastrada pelo admin ainda.</p></div>`;
+      return;
+    }
+    if(shopMode==='effects'){
+      grid.innerHTML = `<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>` + adminEffects.map(shopEffectCard).join('');
+      if(!adminEffects.length) grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Nenhum efeito cadastrado pelo admin ainda.</p></div>`;
+      return;
+    }
+    if(shopMode==='other') grid.innerHTML=`<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>`;
+  };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(e){}
+
+  function patchRenderDashValues(){
+    const nf=user.nameFx||{}; ['NeonName','ShineName','RainbowName','Perspective','GlowCard','PulseCard','BorderRun','FloatCard','AvatarPulse','BannerShine'].forEach(k=>{
+      const id='#fx'+k; const prop=k.charAt(0).toLowerCase()+k.slice(1); const el=q(id); if(el) el.checked=!!nf[prop.replace('Name','')];
+    });
+    const map={fxNeonName:'neon',fxShineName:'shine',fxRainbowName:'rainbow',fxPerspective:'perspective',fxGlowCard:'glowCard',fxPulseCard:'pulseCard',fxBorderRun:'borderRun',fxFloatCard:'floatCard',fxAvatarPulse:'avatarPulse',fxBannerShine:'bannerShine'};
+    Object.entries(map).forEach(([id,prop])=>{const el=q('#'+id); if(el) el.checked=!!nf[prop];});
+    if(q('#fxGlowColor')) q('#fxGlowColor').value=user.fxGlowColor||'#8b5cf6';
+    if(q('#fxCardOpacity')) q('#fxCardOpacity').value=Math.round((user.cardOpacity??0.72)*100);
+    if(q('#fxCardBlur')) q('#fxCardBlur').value=Number(user.cardBlur??14);
+    if(q('#fxBannerOpacity')) q('#fxBannerOpacity').value=Math.round((user.bannerOpacity??1)*100);
+  }
+  const oldDash=window.renderDash || (typeof renderDash==='function'?renderDash:null);
+  window.renderDash=function(){ if(oldDash) oldDash(); patchRenderDashValues(); renderAdminEffects(); };
+  try{ if(typeof renderDash!=='undefined') renderDash=window.renderDash; }catch(e){}
+
+  function applyProfileFx(){
+    const card=q('#profileCard'), name=q('#profileName'), banner=q('#profileBanner'), avatar=q('#profileAvatar'); if(!card) return;
+    const fx=user.nameFx||{}; const glow=user.fxGlowColor||'#8b5cf6';
+    card.style.setProperty('--user-glow', glow);
+    card.style.setProperty('--card-alpha', String(user.cardOpacity??0.72));
+    card.style.setProperty('--card-blur', (user.cardBlur??14)+'px');
+    card.classList.toggle('fx-glow-card',!!fx.glowCard); card.classList.toggle('fx-pulse-card',!!fx.pulseCard); card.classList.toggle('fx-border-run',!!fx.borderRun); card.classList.toggle('fx-float-card',!!fx.floatCard);
+    if(name){ name.classList.toggle('fx-neon-name',!!fx.neon); name.classList.toggle('fx-shine-name',!!fx.shine); name.classList.toggle('fx-rainbow-name',!!fx.rainbow); name.style.setProperty('--user-glow',glow); }
+    if(banner){ banner.style.opacity=String(user.bannerOpacity??1); banner.classList.toggle('fx-banner-shine',!!fx.bannerShine); }
+    if(avatar){ avatar.classList.toggle('fx-avatar-pulse',!!fx.avatarPulse); }
+    if(fx.perspective){ card.onmousemove=(ev)=>{const r=card.getBoundingClientRect(); const x=(ev.clientX-r.left)/r.width-.5; const y=(ev.clientY-r.top)/r.height-.5; card.style.transform=`perspective(900px) rotateY(${x*8}deg) rotateX(${-y*8}deg)`}; card.onmouseleave=()=>{card.style.transform=''}; }
+    else { card.onmousemove=null; card.onmouseleave=null; card.style.transform=''; }
+  }
+  const oldProf=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){ if(oldProf) oldProf(); applyProfileFx(); };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  function saveCustomPatch(e){
+    e.preventDefault(); e.stopImmediatePropagation();
+    user.name=q('#customName')?.value.trim()||user.name; user.bio=q('#customBio')?.value||''; user.bgFx=q('#customBgFx')?.value||'none';
+    user.fxGlowColor=q('#fxGlowColor')?.value||'#8b5cf6'; user.cardOpacity=Number(q('#fxCardOpacity')?.value||72)/100; user.cardBlur=Number(q('#fxCardBlur')?.value||14); user.bannerOpacity=Number(q('#fxBannerOpacity')?.value||100)/100;
+    user.nameFx={neon:!!q('#fxNeonName')?.checked, shine:!!q('#fxShineName')?.checked, rainbow:!!q('#fxRainbowName')?.checked, perspective:!!q('#fxPerspective')?.checked, glowCard:!!q('#fxGlowCard')?.checked, pulseCard:!!q('#fxPulseCard')?.checked, borderRun:!!q('#fxBorderRun')?.checked, floatCard:!!q('#fxFloatCard')?.checked, avatarPulse:!!q('#fxAvatarPulse')?.checked, bannerShine:!!q('#fxBannerShine')?.checked};
+    if(typeof addHistory==='function') addHistory('Customização alterada');
+    Promise.resolve(typeof saveUser==='function'?saveUser('Customização salva!'):null).then(()=>{ if(typeof renderDash==='function') renderDash(); });
+  }
+
+  function openGiftModal(item){
+    let m=q('#lexGiftModal');
+    if(!m){document.body.insertAdjacentHTML('beforeend',`<div id="lexGiftModal" class="modal show"><div class="modal-card lex-gift-card"><button class="modal-close" id="lexGiftClose">×</button><h2>Enviar presente</h2><p>Escolha o destinatário e confirme.</p><div class="gift-summary"><div><span>Item</span><b id="giftItemName"></b></div><div><span>Duração</span><b id="giftDuration">Permanente</b></div><div><span>Preço</span><b id="giftPrice"></b></div></div><label>Destinatário <input id="giftRecipient" placeholder="@slug ou email"></label><label>Mensagem opcional<textarea id="giftMessage" maxlength="100" placeholder="Mensagem para quem receber"></textarea></label><button class="btn primary full" id="giftConfirm">Presentear</button></div></div>`); m=q('#lexGiftModal');}
+    q('#giftItemName').textContent=item.name||'Item'; q('#giftPrice').textContent=(item.price||0)+' Linkwuans'; q('#giftDuration').textContent=item.durationLabel||'Permanente'; m.classList.add('show');
+    q('#lexGiftClose').onclick=()=>m.classList.remove('show');
+    q('#giftConfirm').onclick=async()=>{ const rec=q('#giftRecipient').value.trim(); if(!rec) return toast('Digite o destinatário.'); toast('Presente preparado. Use o admin para liberar se necessário.'); m.classList.remove('show'); };
+  }
+
+  async function buyAdminEffect(id){
+    const ef=adminEffects.find(x=>String(x.id)===String(id)); if(!ef) return toast('Efeito não encontrado.');
+    const key='effect:'+ef.id; if(hasItem(key)) return toast('Você já comprou esse efeito.');
+    const item={id:key,itemId:key,type:'effect',name:ef.name||'Efeito',desc:ef.desc||'',value:ef.url||'',url:ef.url||'',price:Number(ef.price||20),boughtAt:Date.now()};
+    if(Number(user.coins||0)<item.price) return toast('Linkwuans insuficientes.');
+    user.coins=Number(user.coins||0)-item.price; user.inventory=cleanArr(user.inventory).concat([item]);
+    await saveUser('Efeito comprado!'); renderShop(); renderInventory();
+  }
+  function useInvEffect(index){ const it=cleanArr(user.inventory)[index]; if(!it) return; user.bannerEffect=it.value||it.url||''; saveUser('Efeito aplicado no banner!'); }
+
+  function updateAdjust(){
+    const img=q('#adjustFrame'); if(!img) return;
+    const x=Number(q('#adjustX')?.value||0), y=Number(q('#adjustY')?.value||0), sc=Number(q('#adjustScale')?.value||100)/100, rot=Number(q('#adjustRotate')?.value||0);
+    img.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px) scale(${sc}) rotate(${rot}deg)`;
+  }
+  window.updateAdjustPreview=updateAdjust; window.updateAdjustPreviewFixed=updateAdjust;
+  window.openFrameAdjust=function(){
+    if(!user.frame) return toast('Use uma moldura primeiro.');
+    const m=q('#frameAdjustModal'); if(!m) return;
+    const fa=Object.assign({x:0,y:0,scale:1,rotate:0},user.frameAdjust||{});
+    q('#adjustX').value=Number(fa.x||0); q('#adjustY').value=Number(fa.y||0); q('#adjustScale').value=Math.round(Number(fa.scale||1)*100); q('#adjustRotate').value=Number(fa.rotate||0);
+    const av=q('#adjustAvatar'); if(av){av.style.backgroundImage=user.avatar?`url("${safe(user.avatar)}")`:''; av.style.backgroundSize='cover'; av.style.backgroundPosition='center';}
+    const fr=q('#adjustFrame'); if(fr){fr.src=user.frame; fr.style.display='block';}
+    m.classList.add('show','real-centered-modal','dlinky-clean-adjust'); updateAdjust();
+  };
+  try{ if(typeof openFrameAdjust!=='undefined') openFrameAdjust=window.openFrameAdjust; }catch(e){}
+  window.saveFrameAdjust=async function(){ user.frameAdjust={x:Number(q('#adjustX')?.value||0),y:Number(q('#adjustY')?.value||0),scale:Number(q('#adjustScale')?.value||100)/100,rotate:Number(q('#adjustRotate')?.value||0)}; q('#frameAdjustModal')?.classList.remove('show','real-centered-modal','dlinky-clean-adjust'); await saveUser('Ajuste salvo!'); };
+
+  document.addEventListener('click', async function(e){
+    if(e.target && e.target.id==='saveCustom') return saveCustomPatch(e);
+    if(e.target?.dataset?.buyAdminEffect){ e.preventDefault(); e.stopImmediatePropagation(); return buyAdminEffect(e.target.dataset.buyAdminEffect); }
+    if(e.target?.dataset?.giftEffect){ const ef=adminEffects.find(x=>String(x.id)===String(e.target.dataset.giftEffect)); if(ef) openGiftModal({name:ef.name,price:ef.price,durationLabel:'Permanente'}); }
+    if(e.target?.dataset?.giftFrame){ const f=(customFrames||[]).find(x=>String(x.id)===String(e.target.dataset.giftFrame)); if(f) openGiftModal({name:f.name,price:f.price,durationLabel:'Permanente'}); }
+    if(e.target?.dataset?.useInvEffect!==undefined) useInvEffect(Number(e.target.dataset.useInvEffect));
+    if(e.target && e.target.id==='adminAddEffect'){
+      e.preventDefault(); if(!isAdminX()) return toast('Área somente para admin.');
+      const db=dbx(); if(!db) return; const item={name:q('#adminEffectName')?.value.trim()||'Efeito',desc:q('#adminEffectDesc')?.value.trim()||'',price:Number(q('#adminEffectPrice')?.value||20),url:q('#adminEffectUrl')?.value.trim()||'',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:firebase.auth().currentUser?.email||''};
+      if(!item.url) return toast('Coloque a URL do efeito.'); await db.collection('adminEffects').add(item); await loadEffects(); renderAdminEffects(); if(shopMode==='effects') renderShop(); toast('Efeito cadastrado.');
+    }
+    if(e.target?.dataset?.adminDelEffect){ e.preventDefault(); if(!isAdminX()) return; await dbx().collection('adminEffects').doc(e.target.dataset.adminDelEffect).delete(); await loadEffects(); renderAdminEffects(); if(shopMode==='effects') renderShop(); }
+    if(e.target && e.target.id==='saveFrameAdjust'){e.preventDefault(); e.stopImmediatePropagation(); window.saveFrameAdjust();}
+  }, true);
+  ['adjustX','adjustY','adjustScale','adjustRotate'].forEach(id=>q('#'+id)?.addEventListener('input',updateAdjust,true));
+  q('#resetFrameAdjust')?.addEventListener('click',e=>{e.preventDefault(); q('#adjustX').value=0; q('#adjustY').value=0; q('#adjustScale').value=100; q('#adjustRotate').value=0; updateAdjust();},true);
+
+  document.addEventListener('DOMContentLoaded',async()=>{ q('[data-tab="payments"]')?.remove(); await loadEffects(); renderAdminEffects(); patchRenderDashValues(); });
+})();
