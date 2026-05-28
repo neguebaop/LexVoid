@@ -4732,6 +4732,10 @@ body.light{--bg:#f4f6fb;--bg2:#ffffff;--text:#111827;--muted:#536071;--card:#fff
 .lex-effect-shop-preview,.lex-selo-shop-preview{background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden}
 .lex-selo-shop-preview img{max-width:70px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(255,80,200,.6))}
 
-/* LexVoid final hotfix */
-.lex-credit-link{cursor:pointer;text-decoration:none;color:inherit}
-#backToDash[hidden]{display:none!important}
+/* LEXVOID SAFE HOTFIX */
+body.dlinky-public-visitor #backToDash,
+body.dlinky-public-view #backToDash,
+body:not(.lex-owner-profile) #profile #backToDash[data-force-hide="1"]{display:none!important;}
+.dlinky-hud-credit,.madeby{cursor:pointer!important;}
+.lex-inv-selo-preview img{max-width:70px!important;max-height:70px!important;object-fit:contain!important;filter:drop-shadow(0 0 12px #ec4899aa);}
+.lex-inv-effect-preview{background-size:cover!important;background-position:center!important;}
