@@ -318,6 +318,19 @@
         </div>
       </section>
 
+      <section class="dash-tab" id="tab-adminEffects">
+        <div class="panel hero-panel"><h1>Admin Efeitos</h1><p>Cadastre efeitos de banner para vender na loja. Eles aparecem na aba Efeitos.</p></div>
+        <div class="grid2">
+          <div class="panel form-panel"><h2>Adicionar efeito de banner</h2>
+            <label>Nome do efeito<input id="adminEffectName" placeholder="Efeito Raios"></label>
+            <label>Descrição<input id="adminEffectDesc" placeholder="Raios animados no banner"></label>
+            <label>Preço em Linkwuans<input id="adminEffectPrice" type="number" placeholder="20"></label>
+            <label>URL/arquivo GIF/PNG/WebP<input id="adminEffectUrl" placeholder="assets/efeitos/raios.gif ou https://site.com/efeito.gif"></label>
+            <button class="btn primary" id="adminAddEffect">Adicionar efeito</button>
+          </div>
+          <div class="panel"><h2>Efeitos cadastrados</h2><div id="adminEffectsList" class="admin-list"></div></div>
+        </div>
+      </section>
       <section class="dash-tab" id="tab-history"><div class="panel hero-panel"><h1>Histórico Premium</h1><p>Acompanhe compras de premium e Linkwuans.</p></div><div class="grid2"><div class="panel"><h2>Premium</h2><table class="history-table"><thead><tr><th>ID</th><th>Método</th><th>Status</th><th>Valor</th><th>Data</th></tr></thead><tbody id="premiumHistoryRows"><tr><td colspan="5">Nenhuma compra encontrada.</td></tr></tbody></table></div><div class="panel"><h2>Importante</h2><p><b>Comprando o Premium</b></p><p>Pagamentos via PIX podem ser ligados ao Mistic Pay pelo backend.</p><p><b>Legenda</b></p><p><span class="status ok">Aprovado</span> <span class="status wait">Pendente</span> <span class="status bad">Rejeitado</span></p></div></div><div class="panel"><h2>Histórico geral</h2><ul id="historyList"></ul></div></section>
     </main>
   </section>
@@ -368,21 +381,6 @@
   </div>
 
   <div id="paymentModal" class="modal"><div class="modal-card"><button class="modal-close" id="closePayment">×</button><h2>Pagamento PIX</h2><p id="payDesc">Finalize a compra pelo QR Code.</p><label>Copia e cola PIX<input id="pixCode" readonly></label><button class="btn primary full" id="copyPix">Copiar código PIX</button></div></div>
-
-
-      <section class="dash-tab" id="tab-adminEffects">
-        <div class="panel hero-panel"><h1>Admin Efeitos</h1><p>Cadastre efeitos de banner para vender na loja. Eles aparecem na aba Efeitos.</p></div>
-        <div class="grid2">
-          <div class="panel form-panel"><h2>Adicionar efeito de banner</h2>
-            <label>Nome do efeito<input id="adminEffectName" placeholder="Efeito Raios"></label>
-            <label>Descrição<input id="adminEffectDesc" placeholder="Raios animados no banner"></label>
-            <label>Preço em Linkwuans<input id="adminEffectPrice" type="number" placeholder="20"></label>
-            <label>URL/arquivo GIF/PNG/WebP<input id="adminEffectUrl" placeholder="assets/efeitos/raios.gif ou https://site.com/efeito.gif"></label>
-            <button class="btn primary" id="adminAddEffect">Adicionar efeito</button>
-          </div>
-          <div class="panel"><h2>Efeitos cadastrados</h2><div id="adminEffectsList" class="admin-list"></div></div>
-        </div>
-      </section>
   <section id="profile" class="page profile-page">
     <div class="madeby">💜 Feito por LexVoid</div><button class="sound-btn" id="soundBtn">🔈</button>
     <div class="entry-overlay" id="entryOverlay"><h1 id="welcomeText">Clique aqui</h1><span>✧</span></div>
