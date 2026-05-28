@@ -2897,3 +2897,168 @@ loadLandingFeatured();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   setTimeout(boot,900);
 })();
+
+/* === LEXVOID FINAL CATEGORY/SELO/EFFECT/PRICE HOTFIX === */
+(function(){
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const norm = v => String(v||'').trim().toLowerCase();
+  const esc = v => String(v??'').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const safe = v => String(v||'').replace(/"/g,'%22').replace(/'/g,'%27');
+  const inv = () => Array.isArray(user?.inventory) ? user.inventory : (user.inventory=[]);
+  const coins = () => Number(user?.coins||0);
+  const save = async msg => { try{ if(typeof saveUser==='function') await saveUser(msg||'Salvo!'); else if(typeof saveUserData==='function') await saveUserData(); }catch(e){} };
+  const toast2 = msg => { try{ toast(msg); }catch(e){ alert(msg); } };
+
+  function mode(){ try{return shopMode;}catch(e){ return $('.shop-tabs button.active')?.dataset.shopTab || 'coins'; } }
+  function setMode(v){ try{ shopMode=v; }catch(e){} $$('.shop-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.shopTab===v)); }
+  function getInvFilter(){ try{return inventoryFilter;}catch(e){ return $('#inventoryTabs button.active')?.dataset.invFilter || 'todos'; } }
+  function isType(it, type){ const t=norm(it?.type); if(type==='frame') return t==='frame'||t==='moldura'; if(type==='effect') return t==='effect'||t==='efeito'||t==='banner-effect'; if(type==='selo') return t==='selo'||t==='seal'; if(type==='badge') return t==='badge'||t==='insignia'; return false; }
+  function passFilter(it){ const f=norm(getInvFilter()); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return isType(it,'frame'); if(['efeitos','effects','effect'].includes(f)) return isType(it,'effect'); if(['selos','selo'].includes(f)) return isType(it,'selo'); if(['insignias','insígnias','badges','badge'].includes(f)) return isType(it,'badge'); if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
+  window.itemMatchesInventoryFilter = passFilter;
+  try{ itemMatchesInventoryFilter = passFilter; }catch(e){}
+
+  async function loadAllAdminItems(){
+    const db = window.db || (typeof firebase!=='undefined' ? firebase.firestore() : null); if(!db) return;
+    try{ const s=await db.collection('adminSelos').orderBy('createdAt','desc').get(); window.__lexAdminSelosShop=s.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ window.__lexAdminSelosShop=window.__lexAdminSelosShop||[]; }
+    try{ const e=await db.collection('adminEffects').orderBy('createdAt','desc').get(); window.__lexAdminEffectsShop=e.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ window.__lexAdminEffectsShop=window.__lexAdminEffectsShop||[]; }
+  }
+
+  function pricesOf(item){ const p=item?.prices||{}; const base=Number(item?.price||p.perm||p.d30||p.d15||p.d7||p.d3||20); return {d3:Number(p.d3||base),d7:Number(p.d7||base),d15:Number(p.d15||base),d30:Number(p.d30||base),perm:Number(p.perm||base)}; }
+  function priceFor(item,dur){ const p=pricesOf(item); return Number(p[dur] ?? p.perm ?? item.price ?? 20); }
+  function durationSelect(kind,id,item){ const p=pricesOf(item); return `<select class="zyo-duration lex-price-duration" data-kind="${esc(kind)}" data-id="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="d30">30 dias</option><option value="perm">Permanente</option></select>`; }
+  function durationLabel(v){ return ({d3:'3 dias',d7:'7 dias',d15:'15 dias',d30:'30 dias',perm:'Permanente',0:'Permanente'})[v] || v || 'Permanente'; }
+  function owned(kind,item){ const id=norm(item?.id||item?.itemId||''); const url=norm(item?.url||item?.value||''); const name=norm(item?.name||''); return inv().some(it=>{ if(kind==='frame'&&!isType(it,'frame')) return false; if(kind==='effect'&&!isType(it,'effect')) return false; if(kind==='selo'&&!isType(it,'selo')) return false; const vals=[it.id,it.itemId,it.url,it.value,it.name].map(norm); return vals.includes(id)||vals.includes(url)||vals.includes(name)||vals.includes(kind+':'+id); }); }
+
+  function framePreview(item){
+    const avatar = typeof getBestAvatar==='function' ? getBestAvatar() : (user?.avatar||''); const u=item?.url||item?.value||'';
+    return `<div class="lex-shop-frame-preview"><span class="lex-shop-avatar" style="background-image:url('${safe(avatar)}')"></span>${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:''}</div>`;
+  }
+  function frameCard(f){ const id=String(f.id||f.url||f.name); const b=owned('frame',f); const pr=priceFor(f,'d3'); return `<div class="zyo-item-card ${b?'owned':''}" data-product-kind="frame" data-product-id="${esc(id)}"><div class="zyo-item-top">${framePreview(f)}<div><h3>${esc(f.name||'Moldura')}</h3><p>${esc(f.desc||'')}</p>${b?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b data-price-label>${pr} Linkwuans</b></div>${durationSelect('frame',id,f)}<small class="zyo-note">ⓘ Valor muda conforme a duração escolhida.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-lex2-frame="${esc(id)}" ${b?'disabled':''}>🔒 ${b?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-lex2-frame="${esc(id)}">🎁 Presentear</button></div></div>`; }
+  function effectCard(e){ const id=String(e.id||e.url||e.name); const b=owned('effect',e); const pr=priceFor(e,'d3'); return `<div class="zyo-item-card ${b?'owned':''}" data-product-kind="effect" data-product-id="${esc(id)}"><div class="zyo-item-top"><div class="lex-effect-shop-preview" style="background-image:url('${safe(e.url||e.value)}')"></div><div><h3>${esc(e.name||'Efeito')}</h3><p>${esc(e.desc||'Efeito de banner')}</p>${b?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b data-price-label>${pr} Linkwuans</b></div>${durationSelect('effect',id,e)}<small class="zyo-note">ⓘ Aplica no banner do perfil.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-lex2-effect="${esc(id)}" ${b?'disabled':''}>🔒 ${b?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-lex2-effect="${esc(id)}">🎁 Presentear</button></div></div>`; }
+  function seloCard(s){ const id=String(s.id||s.url||s.name); const b=owned('selo',s); const pr=priceFor(s,'d3'); return `<div class="zyo-item-card ${b?'owned':''}" data-product-kind="selo" data-product-id="${esc(id)}"><div class="zyo-item-top"><div class="lex-selo-shop-preview">${s.url?`<img src="${safe(s.url)}">`:'🏷️'}</div><div><h3>${esc(s.name||'Selo')}</h3><p>${esc(s.desc||'Selo ao lado do nome')}</p>${b?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b data-price-label>${pr} Linkwuans</b></div>${durationSelect('selo',id,s)}<small class="zyo-note">ⓘ Use pelo inventário depois da compra.</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-buy-lex2-selo="${esc(id)}" ${b?'disabled':''}>🔒 ${b?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-gift-lex2-selo="${esc(id)}">🎁 Presentear</button></div></div>`; }
+
+  function ensureShopTabs(){ const tabs=$('.shop-tabs'); if(!tabs) return; if(!tabs.querySelector('[data-shop-tab="selos"]')){ const other=tabs.querySelector('[data-shop-tab="other"]'); const b=document.createElement('button'); b.type='button'; b.dataset.shopTab='selos'; b.textContent='Selos'; (other||tabs.lastElementChild)?.insertAdjacentElement(other?'beforebegin':'afterend', b); } }
+  function adminFramesArr(){ try{return Array.isArray(customFrames)?customFrames:[]}catch(e){return []} }
+  function effectsArr(){ return window.__lexAdminEffectsShop||window.__lexAdminEffectsFixed||[]; }
+  function selosArr(){ return window.__lexAdminSelosShop||[]; }
+
+  const oldShop=window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop=function(){
+    ensureShopTabs(); const m=mode(); const grid=$('#shopGrid'); if(!grid) return oldShop&&oldShop();
+    if(['frames','molduras'].includes(m)){ grid.className='zyo-shop-grid'; const arr=adminFramesArr(); grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras exclusivas no seu perfil.</p></div>`+(arr.length?arr.map(frameCard).join(''):'<p>Nenhuma moldura cadastrada pelo admin ainda.</p>'); return; }
+    if(['effects','efeitos'].includes(m)){ grid.className='zyo-shop-grid'; const arr=effectsArr(); grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+(arr.length?arr.map(effectCard).join(''):'<p>Nenhum efeito cadastrado pelo admin ainda.</p>'); return; }
+    if(['selos','selo'].includes(m)){ grid.className='zyo-shop-grid'; const arr=selosArr(); grid.innerHTML=`<div class="zyo-shop-title"><h2>Selos</h2><p>Selos cadastrados pelo admin para aparecer ao lado do nome.</p></div>`+(arr.length?arr.map(seloCard).join(''):'<p>Nenhum selo cadastrado pelo admin ainda.</p>'); return; }
+    if(['other','outros'].includes(m)){ grid.className='zyo-shop-grid'; grid.innerHTML='<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>'; return; }
+    if(oldShop) oldShop(); ensureShopTabs();
+  };
+  try{ renderShop=window.renderShop; }catch(e){}
+
+  function invPreview(it){
+    if(isType(it,'frame')) return framePreview(it);
+    if(isType(it,'effect')) return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(it.url||it.value)}')"></div>`;
+    if(isType(it,'selo')) return `<div class="asset-preview lex-inv-selo-preview">${(it.url||it.value)?`<img src="${safe(it.url||it.value)}">`:'🏷️'}</div>`;
+    return `<div class="asset-preview"><span style="display:grid;place-items:center;height:100%;font-size:36px">✦</span></div>`;
+  }
+  window.renderInventory=function(){
+    if($('#invCoins')) $('#invCoins').textContent=coins(); if($('#invItemsCount')) $('#invItemsCount').textContent=inv().length;
+    const grid=$('#inventoryGrid'); if(!grid) return; const f=getInvFilter(); $$('#inventoryTabs button').forEach(b=>b.classList.toggle('active', norm(b.dataset.invFilter)===norm(f)));
+    const items=inv().map((it,i)=>({it,i})).filter(x=>passFilter(x.it));
+    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML=items.map(({it,i})=>`<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${invPreview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(it.type||'')}</small>${isType(it,'frame')?`<button class="btn primary small" type="button" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${isType(it,'effect')?`<button class="btn primary small" type="button" data-use-lex2-effect="${i}">Usar</button>`:''}${isType(it,'selo')?`<button class="btn primary small" type="button" data-use-lex2-selo="${i}">Usar</button>`:''}<button class="btn dark small" type="button" data-remove-lex2-profile="${i}">Remover do perfil</button></div></div>`).join('');
+  };
+  try{ renderInventory=window.renderInventory; }catch(e){}
+
+  function find(kind,id){ id=String(id); if(kind==='frame') return adminFramesArr().find(x=>String(x.id||x.url||x.name)===id); if(kind==='effect') return effectsArr().find(x=>String(x.id||x.url||x.name)===id); return selosArr().find(x=>String(x.id||x.url||x.name)===id); }
+  async function buy(kind,id){ const obj=find(kind,id); if(!obj) return toast2('Item não encontrado.'); if(owned(kind,obj)) return toast2('Você já comprou esse item. Use pelo inventário.'); const sel=document.querySelector(`.zyo-item-card[data-product-kind="${kind}"][data-product-id="${CSS.escape(id)}"] .lex-price-duration`); const dur=sel?.value||'d3'; const price=priceFor(obj,dur); if(coins()<price) return toast2('Linkwuans insuficientes.'); user.coins=coins()-price; user.inventory=inv(); user.inventory.push({id:`${kind}:${id}`,itemId:`${kind}:${id}`,type:kind==='selo'?'selo':kind==='effect'?'effect':'frame',name:obj.name||kind,desc:obj.desc||'',url:obj.url||obj.value||'',value:obj.url||obj.value||'',price,duration:durationLabel(dur),size:obj.size||32,boughtAt:Date.now()}); await save('Item comprado!'); window.renderShop(); window.renderInventory(); }
+  async function useEffect(i){ const it=inv()[Number(i)]; if(!it) return; user.bannerEffect=it.url||it.value||''; await save('Efeito aplicado no banner!'); applyBannerEffect(); window.renderInventory(); }
+  async function useSelo(i){ const it=inv()[Number(i)]; if(!it) return; user.selos=Array.isArray(user.selos)?user.selos:[]; if(!user.selos.some(s=>norm(s.url)===norm(it.url||it.value)||norm(s.name)===norm(it.name))) user.selos.push({name:it.name,url:it.url||it.value,size:it.size||32}); await save('Selo aplicado!'); try{renderProfile()}catch(e){} window.renderInventory(); }
+  async function removeProfile(i){ const it=inv()[Number(i)]; if(!it) return; if(isType(it,'effect')&&norm(user.bannerEffect)===norm(it.url||it.value)){ user.bannerEffect=''; await save('Efeito removido do perfil. Continua no inventário.'); applyBannerEffect(); } else if(isType(it,'selo')){ user.selos=(user.selos||[]).filter(s=>!(norm(s.url)===norm(it.url||it.value)||norm(s.name)===norm(it.name))); await save('Selo removido do perfil. Continua no inventário.'); try{renderProfile()}catch(e){} } else if(isType(it,'frame')&&norm(user.frame)===norm(it.url||it.value)){ user.frame=''; await save('Moldura removida do perfil. Continua no inventário.'); try{renderProfile()}catch(e){} } else toast2('Removido só do perfil. O item continua no inventário.'); window.renderInventory(); }
+
+  function applyBannerEffect(){ const banner=$('#profileBanner'); if(!banner) return; let fx=banner.querySelector('.lex-banner-effect-layer'); if(!fx){ fx=document.createElement('span'); fx.className='lex-banner-effect-layer'; banner.appendChild(fx); } if(user.bannerEffect){ fx.style.backgroundImage=`url('${safe(user.bannerEffect)}')`; fx.style.display='block'; } else fx.style.display='none'; }
+  function renderSeloByName(){
+    const name=$('#profileName'); if(!name) return; $$('.profile-selos,#profileName .lex-name-selo-wrap').forEach(x=>x.remove()); const arr=Array.isArray(user.selos)?user.selos:[]; if(!arr.length) return;
+    const wrap=document.createElement('span'); wrap.className='lex-name-selo-wrap'; wrap.innerHTML=arr.map(s=>`<img title="${esc(s.name||'Selo')}" src="${safe(s.url||'')}" style="width:${Number(s.size||24)}px;height:${Number(s.size||24)}px">`).join(''); name.appendChild(wrap);
+  }
+  const oldProfile=window.renderProfile || (typeof renderProfile==='function'?renderProfile:null);
+  window.renderProfile=function(){ if(oldProfile) oldProfile(); applyBannerEffect(); renderSeloByName(); };
+  try{ renderProfile=window.renderProfile; }catch(e){}
+
+  document.addEventListener('change', e=>{ const sel=e.target.closest('.lex-price-duration'); if(!sel) return; const card=sel.closest('.zyo-item-card'); const kind=card?.dataset.productKind, id=card?.dataset.productId; const obj=find(kind,id); const lab=card?.querySelector('[data-price-label]'); if(lab&&obj) lab.textContent=priceFor(obj,sel.value)+' Linkwuans'; }, true);
+  document.addEventListener('click', e=>{
+    const tab=e.target.closest('[data-shop-tab]'); if(tab){ setMode(tab.dataset.shopTab); setTimeout(()=>window.renderShop(),0); }
+    let b=e.target.closest('[data-buy-lex2-frame],[data-buy-lex2-effect],[data-buy-lex2-selo]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); if(b.dataset.buyLex2Frame) return buy('frame',b.dataset.buyLex2Frame); if(b.dataset.buyLex2Effect) return buy('effect',b.dataset.buyLex2Effect); return buy('selo',b.dataset.buyLex2Selo); }
+    b=e.target.closest('[data-use-lex2-effect]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return useEffect(b.dataset.useLex2Effect); }
+    b=e.target.closest('[data-use-lex2-selo]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return useSelo(b.dataset.useLex2Selo); }
+    b=e.target.closest('[data-remove-lex2-profile]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return removeProfile(b.dataset.removeLex2Profile); }
+  }, true);
+
+  loadAllAdminItems().then(()=>{ try{window.renderShop()}catch(e){} try{window.renderInventory()}catch(e){} try{window.renderProfile()}catch(e){} });
+})();
+
+/* === LEXVOID RELEASE PATCH: gift único, filtros estritos, selo ajustável === */
+(function(){
+  const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
+  const norm=v=>String(v||'').trim().toLowerCase();
+  const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const safe=v=>String(v||'').replace(/"/g,'%22').replace(/'/g,'%27');
+  function inv(){ return Array.isArray(window.user?.inventory)?window.user.inventory:(window.user.inventory=[]); }
+  function save(msg){ try{ return saveUser(msg||'Salvo!'); }catch(e){ try{return saveUserData();}catch(x){} } }
+  function toastx(m){ try{toast(m)}catch(e){console.log(m)} }
+  function isKind(it,k){ const t=norm(it?.type); if(k==='frame') return ['frame','moldura'].includes(t); if(k==='effect') return ['effect','efeito','banner-effect','banner_effect'].includes(t); if(k==='selo') return ['selo','seal'].includes(t); if(k==='badge') return ['badge','insignia','insígnia'].includes(t); return false; }
+  function currentFilter(){ return document.querySelector('#inventoryTabs button.active')?.dataset.invFilter || (typeof inventoryFilter!=='undefined'?inventoryFilter:'todos'); }
+  function strictPass(it){ const f=norm(currentFilter()); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return isKind(it,'frame'); if(['efeitos','effects','effect'].includes(f)) return isKind(it,'effect'); if(['selos','selo'].includes(f)) return isKind(it,'selo'); if(['insignias','insígnias','badge','badges'].includes(f)) return isKind(it,'badge'); if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
+  window.itemMatchesInventoryFilter=strictPass; try{itemMatchesInventoryFilter=strictPass}catch(e){}
+
+  function avatarUrl(){ try{return getBestAvatar()}catch(e){return window.user?.avatar||''} }
+  function preview(it){
+    if(isKind(it,'frame')) return `<div class="lex-shop-frame-preview lex-inv-big"><span class="lex-shop-avatar" style="background-image:url('${safe(avatarUrl())}')"></span><img src="${safe(it.url||it.value)}" onerror="this.style.display='none'"></div>`;
+    if(isKind(it,'effect')) return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(it.url||it.value)}')"></div>`;
+    if(isKind(it,'selo')) return `<div class="asset-preview lex-inv-selo-preview">${(it.url||it.value)?`<img src="${safe(it.url||it.value)}">`:'🏷️'}</div>`;
+    return `<div class="asset-preview"></div>`;
+  }
+  window.renderInventory=function(){
+    const grid=$('#inventoryGrid'); if(!grid) return;
+    if($('#invCoins')) $('#invCoins').textContent=Number(window.user?.coins||0);
+    if($('#invItemsCount')) $('#invItemsCount').textContent=inv().length;
+    const f=currentFilter(); try{inventoryFilter=f}catch(e){}
+    $$('#inventoryTabs button').forEach(b=>b.classList.toggle('active', norm(b.dataset.invFilter)===norm(f)));
+    const items=inv().map((it,i)=>({it,i})).filter(x=>strictPass(x.it));
+    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML=items.map(({it,i})=>`<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${preview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(it.type||'')}</small>${isKind(it,'frame')?`<button class="btn primary small" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${isKind(it,'effect')?`<button class="btn primary small" data-use-lex-effect-final="${i}">Usar</button>`:''}${isKind(it,'selo')?`<button class="btn primary small" data-use-lex-selo-final="${i}">Usar</button><button class="btn dark small" data-adjust-lex-selo-final="${i}">Ajustar</button>`:''}<button class="btn dark small" data-remove-lex-profile-final="${i}">Remover do perfil</button></div></div>`).join('');
+  };
+  try{renderInventory=window.renderInventory}catch(e){}
+
+  function renderNameSelos(){
+    const name=$('#profileName'); if(!name) return;
+    name.querySelectorAll('.lex-name-selo-wrap').forEach(x=>x.remove());
+    const arr=Array.isArray(window.user?.selos)?window.user.selos:[]; if(!arr.length) return;
+    const sp=document.createElement('span'); sp.className='lex-name-selo-wrap';
+    sp.innerHTML=arr.map(s=>`<img src="${safe(s.url||s.value||'')}" title="${esc(s.name||'Selo')}" style="width:${Number(s.size||22)}px;height:${Number(s.size||22)}px">`).join('');
+    name.appendChild(sp);
+  }
+  const oldProfile=window.renderProfile; window.renderProfile=function(){ if(typeof oldProfile==='function') oldProfile(); renderNameSelos(); }; try{renderProfile=window.renderProfile}catch(e){}
+
+  function applyEffect(i){ const it=inv()[Number(i)]; if(!it) return; window.user.bannerEffect=it.url||it.value||''; save('Efeito aplicado!').then(()=>{ try{applyBannerEffect()}catch(e){}; try{renderProfile()}catch(e){}; renderInventory(); }); }
+  function useSelo(i){ const it=inv()[Number(i)]; if(!it) return; window.user.selos=Array.isArray(window.user.selos)?window.user.selos:[]; const u=it.url||it.value||''; if(!window.user.selos.some(s=>norm(s.url||s.value)===norm(u)||norm(s.name)===norm(it.name))) window.user.selos.push({name:it.name||'Selo',url:u,value:u,size:Number(it.size||24)}); save('Selo aplicado!').then(()=>{renderNameSelos(); renderInventory();}); }
+  function removeOnlyProfile(i){ const it=inv()[Number(i)]; if(!it) return; const u=norm(it.url||it.value); if(isKind(it,'selo')) window.user.selos=(window.user.selos||[]).filter(s=>norm(s.url||s.value)!==u && norm(s.name)!==norm(it.name)); if(isKind(it,'effect')&&norm(window.user.bannerEffect)===u) window.user.bannerEffect=''; if(isKind(it,'frame')&&norm(window.user.frame)===u) window.user.frame=''; save('Removido só do perfil. Continua no inventário.').then(()=>{try{renderProfile()}catch(e){}; renderInventory();}); }
+  function adjustSelo(i){ const it=inv()[Number(i)]; if(!it) return; document.querySelector('#lexSeloAdjustModal')?.remove(); const u=it.url||it.value||''; const size=Number(it.size||24); document.body.insertAdjacentHTML('beforeend',`<div id="lexSeloAdjustModal" class="modal show"><div class="modal-card lex-selo-adjust-card"><button class="modal-close" id="lexSeloAdjustClose">×</button><h2>Ajustar selo</h2><p>Controle o tamanho do selo ao lado do nome.</p><div class="lex-selo-adjust-preview"><span>Nome</span><img src="${safe(u)}" style="width:${size}px;height:${size}px"></div><label>Tamanho <input id="lexSeloSizeRange" type="range" min="12" max="60" value="${size}"></label><button class="btn primary" id="lexSeloSaveAdjust">Salvar ajuste</button></div></div>`); const modal=$('#lexSeloAdjustModal'), img=modal.querySelector('img'), r=$('#lexSeloSizeRange'); r.oninput=()=>{img.style.width=r.value+'px'; img.style.height=r.value+'px';}; $('#lexSeloAdjustClose').onclick=()=>modal.remove(); $('#lexSeloSaveAdjust').onclick=()=>{it.size=Number(r.value); window.user.selos=(window.user.selos||[]).map(s=>norm(s.url||s.value)===norm(u)?{...s,size:Number(r.value)}:s); save('Selo ajustado!').then(()=>{modal.remove(); try{renderProfile()}catch(e){}; renderInventory();});}; }
+
+  function openGiftModal(meta){
+    document.querySelectorAll('#lexGiftOne,#lexGiftModal,#dlinkyGiftModal').forEach(x=>x.remove());
+    document.body.insertAdjacentHTML('beforeend',`<div id="lexGiftOne" class="modal show"><div class="modal-card lex-gift-card"><button class="modal-close" id="giftCloseOne">×</button><h2>Enviar presente</h2><p>Escolha o destinatário e confirme o envio.</p><div class="gift-summary"><div><span>Item</span><b>${esc(meta.name||'Item')}</b></div><div><span>Duração</span><b>${esc(meta.duration||'Permanente')}</b></div><div><span>Preço</span><b>${esc(meta.price||'0 Linkwuans')}</b></div></div><label>Destinatário <input id="giftRecipientOne" placeholder="@slug ou email"></label><label>Mensagem opcional<textarea id="giftMessageOne" maxlength="100" placeholder="Mensagem para quem receber"></textarea></label><button class="btn primary full" id="giftConfirmOne">🎁 Presentear</button></div></div>`);
+    $('#giftCloseOne').onclick=()=>$('#lexGiftOne').remove(); $('#giftConfirmOne').onclick=()=>{ if(!$('#giftRecipientOne').value.trim()) return toastx('Digite o destinatário.'); toastx('Presente preparado.'); $('#lexGiftOne').remove(); };
+  }
+  function giftMetaFromButton(b){ const card=b.closest('.zyo-item-card,.asset-card'); const name=card?.querySelector('h3,b')?.textContent||'Item'; const price=card?.querySelector('[data-price-label],.zyo-price b')?.textContent||'0 Linkwuans'; const dur=card?.querySelector('select')?.selectedOptions?.[0]?.textContent||'Permanente'; return {name,price,duration:dur}; }
+
+  document.addEventListener('click',function(e){
+    const tab=e.target.closest('#inventoryTabs [data-inv-filter]'); if(tab){ e.preventDefault(); e.stopImmediatePropagation(); try{inventoryFilter=tab.dataset.invFilter}catch(x){} $$('#inventoryTabs button').forEach(b=>b.classList.remove('active')); tab.classList.add('active'); setTimeout(()=>window.renderInventory(),0); return; }
+    let b=e.target.closest('[data-use-lex-effect-final]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return applyEffect(b.dataset.useLexEffectFinal); }
+    b=e.target.closest('[data-use-lex-selo-final]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return useSelo(b.dataset.useLexSeloFinal); }
+    b=e.target.closest('[data-adjust-lex-selo-final]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return adjustSelo(b.dataset.adjustLexSeloFinal); }
+    b=e.target.closest('[data-remove-lex-profile-final]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return removeOnlyProfile(b.dataset.removeLexProfileFinal); }
+    b=e.target.closest('[data-gift-frame],[data-gift-effect],[data-gift-lex-selo],[data-gift-lex-effect],[data-gift-lex2-frame],[data-gift-lex2-effect],[data-gift-lex2-selo]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); return openGiftModal(giftMetaFromButton(b)); }
+  },true);
+
+  setTimeout(()=>{ try{window.renderInventory()}catch(e){} try{window.renderProfile()}catch(e){} },400);
+})();
