@@ -35,7 +35,7 @@ const presetUrls = {
 const defaultUser = {
   uid:'', name:'Usuário', slug:'usuario', email:'', bio:'', avatar:'', banner:'', bg:'', video:'', frame:'',
   music:'', welcome:'Clique aqui', color:'#a855f7', particles:false, particleType:'none', verified:false,
-  hideViews:false, template:'default', decoration:'none', views:0, links:[], socials:[], embeds:[], tags:[], history:['Conta criada no Dlinky'], coins:0, inventory:[], purchases:[], selos:[], cursor:'', nameFx:{neon:false,shine:false,rainbow:false,perspective:false}, bgFx:'none', tagSettings:{showFree:true,showDlinky:true,active:['programador','artista','músico']}, colors:{profileBg:'#1E40AF',cardBg:'#000000',textColor:'#FFFFFF',bioColor:'#FFFFFF'}, frameAdjust:{x:0,y:0,scale:1,rotate:0}, particleCount:45, particleSpeed:5, particleSize:'small', entryEffect:'auto'
+  hideViews:false, template:'default', decoration:'none', views:0, links:[], socials:[], embeds:[], tags:[], history:['Conta criada no LexVoid'], coins:0, inventory:[], purchases:[], selos:[], cursor:'', nameFx:{neon:false,shine:false,rainbow:false,perspective:false}, bgFx:'none', tagSettings:{showFree:true,showDlinky:true,active:['programador','artista','músico']}, colors:{profileBg:'#1E40AF',cardBg:'#000000',textColor:'#FFFFFF',bioColor:'#FFFFFF'}, frameAdjust:{x:0,y:0,scale:1,rotate:0}, particleCount:45, particleSpeed:5, particleSize:'small', entryEffect:'auto'
 };
 
 let user = {...defaultUser};
@@ -174,7 +174,7 @@ async function route(){
   if(h === '#/login') { showPage('#auth'); $('#registerForm')&&( $('#registerForm').style.display='none'); $('#loginForm')&&($('#loginForm').style.display='block'); return; }
   if(h === '#/dashboard') { showPage('#dashboard'); renderDash(); return; }
   if(h === '#/assets') { simple('Linky Assets','Área de backgrounds, banners e decorações.'); return; }
-  if(h === '#/premium') { simple('Premium Dlinky','Área premium em construção.'); return; }
+  if(h === '#/premium') { simple('Premium LexVoid','Área premium em construção.'); return; }
 
   const slug = pathSlug || h.replace(/^#\//,'');
   showPage('#profile');
@@ -215,7 +215,7 @@ window.openTab = openTab;
 function renderDash(){
   document.documentElement.style.setProperty('--neon', user.color || '#a855f7');
   $('#sideName') && ($('#sideName').textContent = user.name || 'Usuário');
-  $('#sideUrl') && ($('#sideUrl').textContent = 'dlinky/' + (user.slug || 'usuario'));
+  $('#sideUrl') && ($('#sideUrl').textContent = 'lexvoid/' + (user.slug || 'usuario'));
   $('#dashName') && ($('#dashName').textContent = user.name || 'Usuário');
   $('#dashSlug') && ($('#dashSlug').textContent = '@' + (user.slug || 'usuario'));
   $('#viewsCount') && ($('#viewsCount').textContent = user.views || 0);
@@ -245,7 +245,7 @@ function renderDash(){
   setInput('#uploadBg', user.bg);
   setInput('#uploadCursor', user.cursor);
   setInput('#uploadMusic', user.music);
-  setInput('#payName', user.payment?.payName || 'Dlinky');
+  setInput('#payName', user.payment?.payName || 'LexVoid');
   setInput('#payPix', user.payment?.pixKey || DLINKY_PIX_KEY);
   setInput('#payEndpoint', user.payment?.endpoint || '');
   setInput('#payToken', user.payment?.token || '');
@@ -561,7 +561,7 @@ function pixQrUrl(text){
   return 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(text);
 }
 function getUserPaymentCfg(){
-  return Object.assign({pixKey:DLINKY_PIX_KEY, payName:'Dlinky'}, user.payment || {});
+  return Object.assign({pixKey:DLINKY_PIX_KEY, payName:'LexVoid'}, user.payment || {});
 }
 function itemAlreadyOwned(kind, id, url, name){
   const inv = Array.isArray(user.inventory) ? user.inventory : [];
@@ -1719,7 +1719,7 @@ loadLandingFeatured();
     if(gf){
       e.preventDefault(); e.stopPropagation();
       const id=gf.dataset.giftFrame; const frame=(customFrames||[]).find(f=>f.id===id); if(!frame) return safeToast('Moldura não encontrada.');
-      const duration=document.querySelector(`[data-duration-for="${CSS.escape(id)}"]`)?.value||'Permanente';
+      const sel=document.querySelector(`[data-duration-for="${CSS.escape(id)}"]`); const duration=(sel?.selectedOptions?.[0]?.textContent || sel?.value || 'Permanente').replace(/^0$/,'Permanente');
       openGiftModal('frame',{id,name:frame.name,url:frame.url,price:Number(frame.price||0),duration}); return;
     }
     if(e.target.closest('#dlinkyGiftClose')||e.target.closest('#giftCancel')){q('#dlinkyGiftModal')?.classList.remove('show'); return;}
@@ -1926,4 +1926,171 @@ loadLandingFeatured();
 
   // Carteira: reforça ícone bonito no card de saldo/inventário.
   setTimeout(()=>qa('#tab-inventory .card,#tab-inventory .clean-stat,.inventory-stat').forEach((c,i)=>{ if(i===0) c.classList.add('wallet-card-fixed'); }),600);
+})();
+
+/* ===== LEXVOID FINAL MICRO PATCH: marca, tags emoji, partículas, presentes e ajuste ===== */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>[...r.querySelectorAll(s)];
+  const esc=s=>String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const clean=(u)=>{u=String(u||'').trim(); if(u.startsWith('/originals/')) return 'https://i.pinimg.com'+u; if(u.startsWith('originals/')) return 'https://i.pinimg.com/'+u; if(u.startsWith('//')) return 'https:'+u; return u;};
+  const tagMap = {
+    paz:'☮️ Paz', programador:'💻 Programador', artista:'🖌️ Artista', designer:'🎨 Designer', escritor:'📝 Escritor', investidor:'💸 Investidor', 'músico':'🎸 Músico', musico:'🎸 Músico', fotografo:'📷 Fotógrafo', arlivre:'🏕️ Ar Livre', bebida:'🍺 Bebida', comida:'🍴 Comida',
+    filmes:'🎬 Filmes', seriados:'📺 Seriados', fumante:'🚬 Fumante', negocios:'🏢 Negócios', academia:'💪 Academia', leitor:'📕 Leitor', atleta:'🏃 Atleta', ciencia:'🧪 Ciência', bonito:'💋 Bonito(a)', picante:'🌶️ Picante', animais:'🐾 Animais',
+    adoravel:'🎀 Adorável', produtor:'🎹 Produtor(a)', viagem:'🧳 Viagem', gamer:'🎮 Gamer', anjo:'😇 Anjo(a)', perigoso:'😈 Perigoso(a)', skatista:'🛹 Skatista', provocante:'😏 Provocante', basquete:'🏀 Basquete', frio:'🥶 Frio',
+    palhaco:'🤡 Palhaço(a)', brasil:'🇧🇷 Brasil', habbo:'🅷 Habbo', boliche:'🎳 Boliche', surfista:'🏄 Surfista', verao:'🏝️ Verão', toxico:'☠️ Tóxico(a)', pensativo:'💭 Pensativo(a)', comunicativo:'🗣️ Comunicativo(a)', insonia:'💤 Insônia',
+    apaixonado:'😍 Apaixonado(a)', lgbt:'🌈 LGBT', futebol:'⚽ Futebol', timido:'😳 Tímido(a)', triste:'😭 Triste', bravo:'👺 Bravo(a)', amigavel:'🤝 Amigável', construtor:'👷 Construtor(a)', namorando:'💑 Namorando', solteiro:'🧸 Solteiro(a)',
+    lol:'🎮 League Of Legends', valorant:'🔫 Valorant', cs2:'♠️ Counter-Strike 2', paladins:'🔷 Paladins', dota2:'🟥 Dota 2', fortnite:'🇫 Fortnite', gta:'🚓 Grand Theft Auto V', cyber:'🔮 Cybersecurity', piloto:'🛩️ Piloto(a)'
+  };
+  function brandNow(){
+    document.title='LexVoid — Perfil gamer premium';
+    qa('.brand strong,.dlinky-hud-brand,.side-head b').forEach(el=>el.textContent='LexVoid');
+    qa('.brand-icon').forEach(el=>el.textContent='LV');
+    qa('.madeby,.dlinky-hud-credit').forEach(el=>el.innerHTML=el.innerHTML.replace(/Dlinky|dlinky/g,'LexVoid'));
+    const side=q('#sideUrl'); if(side) side.textContent='lexvoid/'+((window.user&&user.slug)||'usuario');
+  }
+  brandNow(); setTimeout(brandNow,500);
+
+  window.entryOverlayHtml=function(){
+    const txt=(window.user && user.welcome ? user.welcome : 'Clique aqui');
+    return `<h1>${esc(txt)}</h1><span class="entry-star-only">✧</span>`;
+  };
+  try{ if(typeof entryOverlayHtml!=='undefined') entryOverlayHtml=window.entryOverlayHtml; }catch(e){}
+
+  window.renderProfileTagsAndSelos=function(){
+    const box=q('#profileTags');
+    if(box){
+      const ts=(window.user&&user.tagSettings)||{};
+      const active=Array.isArray(ts.active)?ts.active:[];
+      const tags=[];
+      if(ts.showFree!==false) tags.push('✦ grátis');
+      if(ts.showDlinky===true) tags.push('⚡ LexVoid');
+      active.forEach(id=>{
+        const key=String(id||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_-]/g,'');
+        tags.push(tagMap[id] || tagMap[key] || id);
+      });
+      box.innerHTML=tags.map(t=>`<span class="lex-tag">${esc(t)}</span>`).join('');
+    }
+    let seloBox=q('#profileSelos');
+    if(!seloBox && q('#profileSocials')){ seloBox=document.createElement('div'); seloBox.id='profileSelos'; seloBox.className='profile-selos'; q('#profileSocials').insertAdjacentElement('afterend',seloBox); }
+    if(seloBox) seloBox.innerHTML=(user.selos||[]).map(s=>`<img title="${esc(s.name||'Selo')}" src="${clean(s.url||'').replace(/"/g,'%22')}" style="width:${Number(s.size||32)}px;height:${Number(s.size||32)}px">`).join('');
+  };
+  try{ if(typeof renderProfileTagsAndSelos!=='undefined') renderProfileTagsAndSelos=window.renderProfileTagsAndSelos; }catch(e){}
+
+  window.createProfileParticles=function(type){
+    const layer=q('#profileParticleLayer'); if(!layer) return;
+    layer.innerHTML='';
+    if(!q('#profile')?.classList.contains('active')) return;
+    const entry=q('#entryOverlay');
+    if(entry && !entry.classList.contains('hidden')) return;
+    if(!window.user || !user.particles || !type || type==='none') return;
+    const configs={
+      snow:{chars:['❄','❅','❆'],cls:'snow'}, raios:{chars:['⚡','ϟ'],cls:'bolt'}, bolts:{chars:['⚡','ϟ'],cls:'bolt'}, stars:{chars:['✦','✧','✩'],cls:'star'}, hearts:{chars:['❤','♥'],cls:'heart'}, bubbles:{chars:[''],cls:'bubble'}, rain:{chars:['│','╱'],cls:'rain'}, fire:{chars:['🔥','•'],cls:'fire'}, leaves:{chars:['🍃','🍂'],cls:'leaf'}, matrix:{chars:['0','1','▦'],cls:'matrix'}, cats:{chars:['🐾','😺'],cls:'cat'}
+    };
+    const cfg=configs[type]||configs.stars;
+    const count=Math.max(16,Math.min(160,Number(user.particleCount||50)));
+    const speed=Math.max(1,Math.min(10,Number(user.particleSpeed||5)));
+    const sizeMap={small:[9,15],medium:[14,23],large:[22,36]};
+    const sz=sizeMap[user.particleSize||'small']||sizeMap.small;
+    layer.className='lexvoid-particle-layer';
+    for(let i=0;i<count;i++){
+      const el=document.createElement('span');
+      el.className='lex-fx lex-fx-'+cfg.cls;
+      el.textContent=cfg.chars[Math.floor(Math.random()*cfg.chars.length)];
+      const s=sz[0]+Math.random()*(sz[1]-sz[0]);
+      el.style.left=(Math.random()*100)+'vw';
+      el.style.fontSize=s+'px';
+      el.style.setProperty('--drift', ((Math.random()*90)-45)+'px');
+      el.style.animationDuration=(Math.max(5,19-speed*1.25)+Math.random()*8)+'s';
+      el.style.animationDelay=(-Math.random()*16)+'s';
+      if(cfg.cls==='bubble'){el.style.width=s+'px';el.style.height=s+'px';}
+      layer.appendChild(el);
+    }
+  };
+  try{ if(typeof createProfileParticles!=='undefined') createProfileParticles=window.createProfileParticles; }catch(e){}
+
+  const prevRender=window.renderProfile || (typeof renderProfile!=='undefined'?renderProfile:null);
+  window.renderProfile=function(){
+    if(typeof prevRender==='function') prevRender();
+    brandNow();
+    const entry=q('#entryOverlay');
+    const layer=q('#profileParticleLayer'); if(layer) layer.innerHTML='';
+    if(entry){
+      entry.innerHTML=window.entryOverlayHtml();
+      entry.classList.remove('hidden');
+      entry.onclick=()=>{
+        entry.classList.add('hidden');
+        const a=q('#profileAudio'); if(a && user.music){ a.src=clean(user.music); a.load(); a.play().catch(()=>{}); }
+        setTimeout(()=>window.createProfileParticles(user.particleType||'none'),120);
+        try{ if(typeof countProfileViewOnce==='function') countProfileViewOnce(); }catch(e){}
+      };
+    }
+    window.renderProfileTagsAndSelos();
+    const pf=q('#profileFrame');
+    if(pf && user.frame){
+      const fa=Object.assign({x:0,y:0,scale:1,rotate:0},user.frameAdjust||{});
+      pf.src=clean(user.frame); pf.style.display='block'; pf.classList.add('manual-adjusted');
+      pf.style.setProperty('--frame-x',(Number(fa.x)||0)+'px');
+      pf.style.setProperty('--frame-y',(Number(fa.y)||0)+'px');
+      pf.style.setProperty('--frame-scale',Number(fa.scale||1));
+      pf.style.setProperty('--frame-rotate',(Number(fa.rotate)||0)+'deg');
+    }
+  };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  function updateAdjust(){
+    const img=q('#adjustFrame'); if(!img) return;
+    const x=Number(q('#adjustX')?.value||0), y=Number(q('#adjustY')?.value||0), sc=Number(q('#adjustScale')?.value||100)/100, rot=Number(q('#adjustRotate')?.value||0);
+    img.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px) scale(${sc}) rotate(${rot}deg)`;
+  }
+  window.updateAdjustPreview=updateAdjust; window.updateAdjustPreviewFixed=updateAdjust;
+  ['adjustX','adjustY','adjustScale','adjustRotate'].forEach(id=>q('#'+id)?.addEventListener('input',updateAdjust,true));
+  window.openFrameAdjust=function(){
+    if(!user.frame) return (typeof toast==='function'?toast('Use uma moldura primeiro.'):alert('Use uma moldura primeiro.'));
+    const modal=q('#frameAdjustModal'); if(!modal) return;
+    const fa=Object.assign({x:0,y:0,scale:1,rotate:0},user.frameAdjust||{});
+    ['adjustX','adjustY','adjustRotate'].forEach(id=>{ const el=q('#'+id); if(el) el.value=Number(fa[id.replace('adjust','').toLowerCase()]||0); });
+    if(q('#adjustX')) q('#adjustX').value=Number(fa.x||0);
+    if(q('#adjustY')) q('#adjustY').value=Number(fa.y||0);
+    if(q('#adjustRotate')) q('#adjustRotate').value=Number(fa.rotate||0);
+    if(q('#adjustScale')) q('#adjustScale').value=Math.round(Number(fa.scale||1)*100);
+    const av=q('#adjustAvatar'); if(av){ av.style.backgroundImage=user.avatar?`url("${clean(user.avatar).replace(/"/g,'%22')}")`:''; av.style.backgroundSize='cover'; av.style.backgroundPosition='center'; }
+    const img=q('#adjustFrame'); if(img){ img.src=clean(user.frame); img.style.display='block'; }
+    modal.classList.add('show','real-centered-modal','dlinky-clean-adjust');
+    updateAdjust();
+  };
+  try{ if(typeof openFrameAdjust!=='undefined') openFrameAdjust=window.openFrameAdjust; }catch(e){}
+  window.saveFrameAdjust=async function(){
+    user.frameAdjust={x:Number(q('#adjustX')?.value||0),y:Number(q('#adjustY')?.value||0),scale:Number(q('#adjustScale')?.value||100)/100,rotate:Number(q('#adjustRotate')?.value||0)};
+    q('#frameAdjustModal')?.classList.remove('show','real-centered-modal','dlinky-clean-adjust');
+    try{addHistory('Ajuste da moldura salvo'); await saveUser('Ajuste salvo!');}catch(e){ if(typeof toast==='function') toast('Ajuste salvo!'); }
+    if(q('#profile')?.classList.contains('active')) window.renderProfile();
+  };
+  q('#saveFrameAdjust')?.addEventListener('click',(e)=>{e.preventDefault(); e.stopImmediatePropagation(); window.saveFrameAdjust();},true);
+
+  // Duração permanente no presente e modal de presente sempre abre com texto bonito.
+  document.addEventListener('click', (e)=>{
+    const gf=e.target.closest('[data-gift-frame]');
+    if(!gf) return;
+    const id=gf.dataset.giftFrame;
+    const sel=document.querySelector(`[data-duration-for="${CSS.escape(id)}"]`);
+    if(sel && sel.value==='0') sel.dataset.lexDurationLabel='Permanente';
+  }, true);
+  const oldOpenGift=window.openGiftModal;
+  if(typeof oldOpenGift==='function'){
+    window.openGiftModal=function(kind,data){ if(data && (data.duration==='0'||data.duration===0)) data.duration='Permanente'; return oldOpenGift(kind,data); };
+  }
+
+  function polishShopAndInventory(){
+    qa('.zyo-effect-preview,.pretty-effect-preview').forEach((el,i)=>{ const arr=['✨','🔴','💫','🌀']; el.textContent=arr[i%arr.length]; el.classList.add('lex-effect-pretty'); });
+    qa('.zyo-price').forEach(el=>{ el.innerHTML=el.innerHTML.replace(/Zyons|Zylons|Linkwans/gi,'Linkwuans'); });
+    qa('.clean-stat,.card,.wallet-card-fixed').forEach((c,i)=>{ if(/Saldo|Carteira/.test(c.textContent||'')) c.classList.add('lex-wallet-card'); });
+  }
+  const oldShop=window.renderShop || (typeof renderShop!=='undefined'?renderShop:null);
+  window.renderShop=function(){ if(typeof oldShop==='function') oldShop(); setTimeout(polishShopAndInventory,40); };
+  try{ if(typeof renderShop!=='undefined') renderShop=window.renderShop; }catch(e){}
+  const oldInv=window.renderInventory || (typeof renderInventory!=='undefined'?renderInventory:null);
+  window.renderInventory=function(){ if(typeof oldInv==='function') oldInv(); setTimeout(polishShopAndInventory,40); };
+  try{ if(typeof renderInventory!=='undefined') renderInventory=window.renderInventory; }catch(e){}
+  setTimeout(polishShopAndInventory,600);
 })();
