@@ -3063,120 +3063,250 @@ loadLandingFeatured();
   setTimeout(()=>{ try{window.renderInventory()}catch(e){} try{window.renderProfile()}catch(e){} },400);
 })();
 
-/* === LEXVOID HOTFIX: sync admin removals, strict inventory categories, single purchase modal === */
+/* === LEXVOID HOTFIX FINAL: preços por duração em efeitos + inventário sincronizado com Admin Selos/Efeitos/Molduras === */
 (function(){
-  const $=(s,r=document)=>r.querySelector(s);
-  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const norm=v=>String(v||'').trim().toLowerCase();
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const safe=v=>String(v||'').replace(/"/g,'%22').replace(/'/g,'%27');
-  const kindOf=it=>{const t=norm(it&&it.type); if(['frame','moldura'].includes(t))return'frame'; if(['effect','efeito','banner-effect','banner_effect'].includes(t))return'effect'; if(['selo','seal'].includes(t))return'selo'; if(['badge','insignia','insígnia'].includes(t))return'badge'; return t||'item'};
-  const itemKeys=it=>[it?.id,it?.itemId,it?.url,it?.value,it?.name].map(norm).filter(Boolean).flatMap(x=>[x,x.replace(/^frame:/,''),x.replace(/^effect:/,''),x.replace(/^selo:/,'')]);
-  function adminArr(kind){
-    try{
-      if(kind==='frame') return (Array.isArray(customFrames)?customFrames:[]);
-      if(kind==='effect') return (window.__lexAdminEffectsShop||window.__lexAdminEffectsFixed||window.__lexAdminEffectsClean||[]);
-      if(kind==='selo') return (window.__lexAdminSelosShop||window.adminSelos||[]);
-    }catch(e){}
-    return [];
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const safe = v => String(v || '').replace(/"/g,'%22').replace(/'/g,'%27');
+  const norm = v => String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9:/._-]+/g,'');
+  const inv = () => Array.isArray(window.user?.inventory) ? window.user.inventory : (window.user.inventory = []);
+  const coins = () => Number(window.user?.coins || 0);
+  const msg = t => { try { toast(t); } catch(e) { console.log(t); } };
+  const save = async (m) => { try { if (typeof saveUser === 'function') await saveUser(m || 'Salvo!'); } catch(e){} };
+  const db = () => { try { return firebase.firestore(); } catch(e) { return null; } };
+
+  window.__lexAdminFramesStrict = window.__lexAdminFramesStrict || [];
+  window.__lexAdminEffectsStrict = window.__lexAdminEffectsStrict || [];
+  window.__lexAdminSelosStrict = window.__lexAdminSelosStrict || [];
+  let cleanedOnce = false;
+
+  function mode(){ try { return window.shopMode || shopMode; } catch(e) { return $('.shop-tabs button.active')?.dataset.shopTab || 'coins'; } }
+  function setMode(v){ try { window.shopMode = v; shopMode = v; } catch(e) { window.shopMode = v; } $$('.shop-tabs button').forEach(b => b.classList.toggle('active', b.dataset.shopTab === v)); }
+  function invFilter(){ try { return window.inventoryFilter || inventoryFilter; } catch(e) { return $('#inventoryTabs button.active')?.dataset.invFilter || 'todos'; } }
+  function typeOf(it){ const t = norm(it?.type); if(t.includes('frame') || t.includes('moldura')) return 'frame'; if(t.includes('effect') || t.includes('efeito') || t.includes('banner')) return 'effect'; if(t.includes('selo') || t.includes('seal')) return 'selo'; if(t.includes('badge') || t.includes('insign')) return 'badge'; return t || 'other'; }
+  function keysOf(obj){ return [obj?.id,obj?.itemId,obj?.frameId,obj?.seloId,obj?.effectId,obj?.url,obj?.value,obj?.frame,obj?.name].map(norm).filter(Boolean); }
+  function sameItem(a,b){ const ak = keysOf(a), bk = keysOf(b); return ak.some(x => bk.includes(x) || bk.includes(x.replace(/^(frame|effect|selo):/,'')) || ak.includes((b?.type ? norm(b.type)+':' : '')+x)); }
+  function adminList(kind){ if(kind === 'frame') return Array.isArray(window.customFrames) ? window.customFrames : (window.__lexAdminFramesStrict || []); if(kind === 'effect') return window.__lexAdminEffectsStrict || window.__lexAdminEffectsShop || window.__lexAdminEffectsFixed || []; if(kind === 'selo') return window.__lexAdminSelosStrict || window.__lexAdminSelosShop || []; return []; }
+  function stillExistsInAdmin(it){ const k = typeOf(it); if(!['frame','effect','selo'].includes(k)) return true; const arr = adminList(k); return arr.some(a => sameItem(it, a) || sameItem({ ...it, id: String(it.id||'').replace(k+':',''), itemId: String(it.itemId||'').replace(k+':','') }, a)); }
+
+  async function loadAdminStrict(){
+    const f = db();
+    if(!f) return;
+    try { if(Array.isArray(window.customFrames)) window.__lexAdminFramesStrict = window.customFrames; } catch(e){}
+    try { const s = await f.collection('adminEffects').orderBy('createdAt','desc').get(); window.__lexAdminEffectsStrict = s.docs.map(d => ({ id:d.id, ...d.data() })); window.__lexAdminEffectsShop = window.__lexAdminEffectsStrict; window.__lexAdminEffectsFixed = window.__lexAdminEffectsStrict; window.__lexAdminEffects = window.__lexAdminEffectsStrict; } catch(e) { window.__lexAdminEffectsStrict = window.__lexAdminEffectsStrict || []; }
+    try { const s = await f.collection('adminSelos').orderBy('createdAt','desc').get(); window.__lexAdminSelosStrict = s.docs.map(d => ({ id:d.id, ...d.data() })); window.__lexAdminSelosShop = window.__lexAdminSelosStrict; } catch(e) { window.__lexAdminSelosStrict = window.__lexAdminSelosStrict || []; }
   }
-  function adminKeySet(kind){ const s=new Set(); adminArr(kind).forEach(a=>itemKeys(a).forEach(k=>s.add(k))); return s; }
-  function stillExists(it){ const k=kindOf(it); if(!['frame','effect','selo'].includes(k)) return true; const set=adminKeySet(k); if(!set.size) return true; return itemKeys(it).some(x=>set.has(x)); }
-  function inv(){ if(!Array.isArray(window.user?.inventory)) window.user.inventory=[]; return window.user.inventory; }
-  async function cleanCurrentInventory(){
+
+  async function cleanInventoryFromDeletedAdmin(){
     if(!window.user) return;
-    const before=inv().length;
-    window.user.inventory=inv().filter(stillExists);
-    window.user.selos=(Array.isArray(window.user.selos)?window.user.selos:[]).filter(s=>stillExists({type:'selo',...s}));
-    if(window.user.frame && !stillExists({type:'frame',url:window.user.frame,value:window.user.frame})) window.user.frame='';
-    if(window.user.bannerEffect && !stillExists({type:'effect',url:window.user.bannerEffect,value:window.user.bannerEffect})) window.user.bannerEffect='';
-    if(window.user.inventory.length!==before){ try{ await saveUser('Inventário sincronizado com o admin.'); }catch(e){} }
-  }
-  async function cleanAllUsers(kind, deleted){
-    if(!window.firebase || !firebase.firestore) return;
-    const db=firebase.firestore(); const ks=new Set(itemKeys({type:kind,...deleted}));
-    try{
-      const snap=await db.collection('users').get();
-      const batch=db.batch(); let n=0;
-      snap.forEach(doc=>{
-        const d=doc.data()||{}; let changed=false;
-        const newInv=(Array.isArray(d.inventory)?d.inventory:[]).filter(it=>!(kindOf(it)===kind && itemKeys(it).some(k=>ks.has(k))));
-        if(newInv.length!==(Array.isArray(d.inventory)?d.inventory:[]).length) changed=true;
-        const patch={inventory:newInv};
-        if(kind==='frame' && itemKeys({type:'frame',url:d.frame,value:d.frame}).some(k=>ks.has(k))){patch.frame=''; changed=true;}
-        if(kind==='effect' && itemKeys({type:'effect',url:d.bannerEffect,value:d.bannerEffect}).some(k=>ks.has(k))){patch.bannerEffect=''; changed=true;}
-        if(kind==='selo' && Array.isArray(d.selos)){ const ns=d.selos.filter(s=>!itemKeys({type:'selo',...s}).some(k=>ks.has(k))); if(ns.length!==d.selos.length){patch.selos=ns; changed=true;} }
-        if(changed){ batch.set(doc.ref,patch,{merge:true}); n++; }
-      });
-      if(n) await batch.commit();
-    }catch(e){ console.warn('cleanup users failed',e); }
-    try{
-      const ps=await db.collection('profiles').get(); const batch2=db.batch(); let n2=0;
-      ps.forEach(doc=>{ const d=doc.data()||{}; let changed=false; const patch={};
-        if(kind==='frame' && itemKeys({type:'frame',url:d.frame,value:d.frame}).some(k=>ks.has(k))){patch.frame=''; changed=true;}
-        if(kind==='effect' && itemKeys({type:'effect',url:d.bannerEffect,value:d.bannerEffect}).some(k=>ks.has(k))){patch.bannerEffect=''; changed=true;}
-        if(kind==='selo' && Array.isArray(d.selos)){ const ns=d.selos.filter(s=>!itemKeys({type:'selo',...s}).some(k=>ks.has(k))); if(ns.length!==d.selos.length){patch.selos=ns; changed=true;} }
-        if(changed){ batch2.set(doc.ref,patch,{merge:true}); n2++; }
-      });
-      if(n2) await batch2.commit();
-    }catch(e){}
-  }
-
-  const oldLoad=window.loadAdminData || (typeof loadAdminData==='function'?loadAdminData:null);
-  window.loadAdminData=async function(){ if(oldLoad) await oldLoad(); await cleanCurrentInventory(); };
-  try{ loadAdminData=window.loadAdminData; }catch(e){}
-
-  const oldInv=window.renderInventory || (typeof renderInventory==='function'?renderInventory:null);
-  function filterNow(){ return norm($('#inventoryTabs button.active')?.dataset.invFilter || (typeof inventoryFilter!=='undefined'?inventoryFilter:'todos')); }
-  function pass(it){ const f=filterNow(); const k=kindOf(it); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return k==='frame'; if(['efeitos','effects','effect'].includes(f)) return k==='effect'; if(['selos','selo'].includes(f)) return k==='selo'; if(['insignias','insígnias','badges','badge'].includes(f)) return k==='badge'; if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
-  function avatar(){ try{return getBestAvatar()}catch(e){return window.user?.avatar||''} }
-  function preview(it){ const k=kindOf(it); const u=it.url||it.value||''; if(k==='frame') return `<div class="lex-shop-frame-preview lex-inv-big"><span class="lex-shop-avatar" style="background-image:url('${safe(avatar())}')"></span><img src="${safe(u)}"></div>`; if(k==='effect') return `<div class="asset-preview lex-inv-effect-preview"><img src="${safe(u)}" onerror="this.style.display='none';this.parentElement.classList.add('empty')"></div>`; if(k==='selo') return `<div class="asset-preview lex-inv-selo-preview"><img src="${safe(u)}" onerror="this.style.display='none';this.parentElement.classList.add('empty')"></div>`; return `<div class="asset-preview"></div>`; }
-  window.renderInventory=function(){
-    cleanCurrentInventory();
-    const grid=$('#inventoryGrid'); if(!grid){ if(oldInv) oldInv(); return; }
-    const f=filterNow(); try{inventoryFilter=f}catch(e){}
-    if($('#invCoins')) $('#invCoins').textContent=Number(window.user?.coins||0);
-    const visible=inv().filter(stillExists); if($('#invItemsCount')) $('#invItemsCount').textContent=visible.length;
-    $$('#inventoryTabs button').forEach(b=>b.classList.toggle('active', norm(b.dataset.invFilter)===norm(f)));
-    const items=visible.map((it,i)=>({it,i:inv().indexOf(it)})).filter(x=>pass(x.it));
-    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
-    grid.innerHTML=items.map(({it,i})=>{ const k=kindOf(it); return `<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${preview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(k)}</small>${k==='frame'?`<button class="btn primary small" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${k==='effect'?`<button class="btn primary small" data-use-lex-effect-final="${i}">Usar</button>`:''}${k==='selo'?`<button class="btn primary small" data-use-lex-selo-final="${i}">Usar</button><button class="btn dark small" data-adjust-lex-selo-final="${i}">Ajustar</button>`:''}<button class="btn dark small" data-remove-lex-profile-final="${i}">Remover do perfil</button></div></div>`; }).join('');
-  };
-  try{ renderInventory=window.renderInventory; }catch(e){}
-
-  document.addEventListener('click', async function(e){
-    const delF=e.target.closest('[data-admin-del-frame]');
-    const delS=e.target.closest('[data-admin-del-selo]');
-    const delE=e.target.closest('[data-admin-del-effect-final],[data-del-admin-effect-clean],[data-admin-del-effect]');
-    const btn=delF||delS||delE;
-    if(btn){
-      const kind=delF?'frame':delS?'selo':'effect';
-      const id=delF?.dataset.adminDelFrame || delS?.dataset.adminDelSelo || delE?.dataset.adminDelEffectFinal || delE?.dataset.delAdminEffectClean || delE?.dataset.adminDelEffect;
-      const source=adminArr(kind).find(x=>String(x.id)===String(id)) || {id};
-      setTimeout(async()=>{ await cleanAllUsers(kind,source); await cleanCurrentInventory(); try{window.renderInventory()}catch(x){} try{window.renderShop&&window.renderShop()}catch(x){} },900);
+    const before = inv().length;
+    const kept = inv().filter(stillExistsInAdmin);
+    if(kept.length !== before){
+      window.user.inventory = kept;
+      const validSelos = adminList('selo');
+      if(Array.isArray(window.user.selos)) window.user.selos = window.user.selos.filter(s => validSelos.some(a => sameItem(s,a)));
+      if(window.user.bannerEffect && !adminList('effect').some(e => sameItem({url:window.user.bannerEffect,value:window.user.bannerEffect,type:'effect'},e))) window.user.bannerEffect = '';
+      if(window.user.frame && !adminList('frame').some(fr => sameItem({url:window.user.frame,value:window.user.frame,type:'frame'},fr))) window.user.frame = '';
+      await save('Inventário sincronizado com o admin.');
     }
+    cleanedOnce = true;
+  }
+
+  function pricesOf(item){
+    const p = item?.prices || item?.priceMap || item?.durations || {};
+    const base = Number(item?.price || p.d3 || p['3'] || p.three || 10);
+    return {
+      d3: Number(p.d3 ?? p['3'] ?? base),
+      d7: Number(p.d7 ?? p['7'] ?? Math.ceil(base * 1.5)),
+      d15: Number(p.d15 ?? p['15'] ?? Math.ceil(base * 2.5)),
+      d30: Number(p.d30 ?? p['30'] ?? Math.ceil(base * 4)),
+      perm: Number(p.perm ?? p.permanent ?? p.permanente ?? Math.ceil(base * 8))
+    };
+  }
+  function priceFor(item, dur){ const p = pricesOf(item); return Number(p[dur] ?? p.d3 ?? item?.price ?? 0); }
+  function durationLabel(v){ return ({d3:'3 dias',d7:'7 dias',d15:'15 dias',d30:'30 dias',perm:'Permanente',0:'Permanente'})[v] || '3 dias'; }
+  function durationSelect(kind,id,item){ const p = pricesOf(item); return `<select class="zyo-duration lex-final-price-duration" data-kind="${esc(kind)}" data-id="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="d30">30 dias</option><option value="perm">Permanente</option></select>`; }
+  function findProduct(kind,id){ id = String(id); return adminList(kind).find(x => String(x.id||x.url||x.name) === id || sameItem({id,itemId:id,type:kind}, x)); }
+  function owned(kind,item){ return inv().some(it => typeOf(it) === kind && sameItem(it,item)); }
+  function framePreview(item){ const av = (typeof getBestAvatar === 'function' ? getBestAvatar() : window.user?.avatar) || ''; const url = item?.url || item?.value || ''; return `<div class="lex-shop-frame-preview"><span class="lex-shop-avatar" style="background-image:url('${safe(av)}')"></span>${url ? `<img src="${safe(url)}" onerror="this.style.display='none'">` : ''}</div>`; }
+  function effectPreview(item){ const url = item?.url || item?.value || ''; return `<div class="lex-effect-shop-preview" style="background-image:url('${safe(url)}')"></div>`; }
+  function seloPreview(item){ const url = item?.url || item?.value || ''; return `<div class="lex-selo-shop-preview">${url ? `<img src="${safe(url)}" onerror="this.style.display='none'">` : '🏷️'}</div>`; }
+  function card(kind,item){
+    const id = String(item.id || item.url || item.name || '');
+    const bought = owned(kind,item);
+    const p = priceFor(item,'d3');
+    const prev = kind === 'frame' ? framePreview(item) : kind === 'effect' ? effectPreview(item) : seloPreview(item);
+    const typeLabel = kind === 'frame' ? 'Moldura' : kind === 'effect' ? 'Efeito' : 'Selo';
+    const note = kind === 'effect' ? 'ⓘ Aplica no banner do perfil.' : kind === 'selo' ? 'ⓘ Use pelo inventário depois da compra.' : 'ⓘ Valor muda conforme a duração escolhida.';
+    return `<div class="zyo-item-card ${bought?'owned':''}" data-product-kind="${kind}" data-product-id="${esc(id)}"><div class="zyo-item-top">${prev}<div><h3>${esc(item.name || typeLabel)}</h3><p>${esc(item.desc || '')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b data-price-label>${p} Linkwuans</b></div>${durationSelect(kind,id,item)}<small class="zyo-note">${note}</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-lex-final-buy="${kind}" data-lex-final-id="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-lex-final-gift="${kind}" data-lex-final-id="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+
+  function ensureShopTabs(){
+    const tabs = $('.shop-tabs'); if(!tabs) return;
+    if(!tabs.querySelector('[data-shop-tab="selos"]')){ const b = document.createElement('button'); b.type='button'; b.dataset.shopTab='selos'; b.textContent='Selos'; const other=tabs.querySelector('[data-shop-tab="other"]'); (other||tabs.lastElementChild).insertAdjacentElement(other?'beforebegin':'afterend', b); }
+  }
+
+  const oldRenderShop = window.renderShop || (typeof renderShop === 'function' ? renderShop : null);
+  window.renderShop = function(){
+    ensureShopTabs();
+    const grid = $('#shopGrid'); if(!grid){ if(oldRenderShop) oldRenderShop(); return; }
+    const m = mode(); $$('.shop-tabs button').forEach(b => b.classList.toggle('active', b.dataset.shopTab === m));
+    if(['frames','molduras'].includes(norm(m))){ const arr = adminList('frame'); grid.className='zyo-shop-grid'; grid.innerHTML = `<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras exclusivas no seu perfil.</p></div>` + (arr.length ? arr.map(x => card('frame',x)).join('') : '<p>Nenhuma moldura cadastrada pelo admin ainda.</p>'); return; }
+    if(['effects','efeitos'].includes(norm(m))){ const arr = adminList('effect'); grid.className='zyo-shop-grid'; grid.innerHTML = `<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>` + (arr.length ? arr.map(x => card('effect',x)).join('') : '<p>Nenhum efeito cadastrado pelo admin ainda.</p>'); return; }
+    if(['selos','selo'].includes(norm(m))){ const arr = adminList('selo'); grid.className='zyo-shop-grid'; grid.innerHTML = `<div class="zyo-shop-title"><h2>Selos</h2><p>Selos cadastrados pelo admin para aparecer ao lado do nome.</p></div>` + (arr.length ? arr.map(x => card('selo',x)).join('') : '<p>Nenhum selo cadastrado pelo admin ainda.</p>'); return; }
+    if(['other','outros'].includes(norm(m))){ grid.className='zyo-shop-grid'; grid.innerHTML='<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>'; return; }
+    if(oldRenderShop) oldRenderShop();
+  };
+  try { renderShop = window.renderShop; } catch(e){}
+
+  function passFilter(it){ const f = norm(invFilter()); const t = typeOf(it); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return t==='frame'; if(['efeitos','effects','effect'].includes(f)) return t==='effect'; if(['selos','selo'].includes(f)) return t==='selo'; if(['insignias','insígnias','badges','badge'].includes(f)) return t==='badge'; if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
+  function invPreview(it){ if(typeOf(it)==='frame') return framePreview(it); if(typeOf(it)==='effect') return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(it.url||it.value)}')"></div>`; if(typeOf(it)==='selo') return `<div class="asset-preview lex-inv-selo-preview">${(it.url||it.value)?`<img src="${safe(it.url||it.value)}" onerror="this.style.display='none'">`:'🏷️'}</div>`; return '<div class="asset-preview">✦</div>'; }
+  window.renderInventory = function(){
+    if(!cleanedOnce) cleanInventoryFromDeletedAdmin();
+    const grid = $('#inventoryGrid'); if(!grid) return;
+    if($('#invCoins')) $('#invCoins').textContent = coins();
+    const valid = inv().filter(stillExistsInAdmin);
+    if($('#invItemsCount')) $('#invItemsCount').textContent = valid.length;
+    const f = invFilter(); $$('#inventoryTabs button').forEach(b => b.classList.toggle('active', norm(b.dataset.invFilter)===norm(f)));
+    const items = valid.map((it,i) => ({it,i: inv().indexOf(it)})).filter(x => passFilter(x.it));
+    if(!items.length){ grid.innerHTML = '<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML = items.map(({it,i}) => `<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${invPreview(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(typeOf(it))}</small>${typeOf(it)==='frame'?`<button class="btn primary small" type="button" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${typeOf(it)==='effect'?`<button class="btn primary small" type="button" data-use-lex2-effect="${i}">Usar</button>`:''}${typeOf(it)==='selo'?`<button class="btn primary small" type="button" data-use-lex2-selo="${i}">Usar</button>`:''}<button class="btn dark small" type="button" data-remove-lex2-profile="${i}">Remover do perfil</button></div></div>`).join('');
+  };
+  try { renderInventory = window.renderInventory; } catch(e){}
+
+  async function buy(kind,id){
+    const item = findProduct(kind,id); if(!item) return msg('Item não encontrado.');
+    if(owned(kind,item)) return msg('Você já comprou esse item. Use pelo inventário.');
+    const cardEl = document.querySelector(`.zyo-item-card[data-product-kind="${kind}"][data-product-id="${CSS.escape(id)}"]`);
+    const dur = cardEl?.querySelector('.lex-final-price-duration')?.value || 'd3';
+    const price = priceFor(item,dur);
+    if(coins() < price) return msg('Linkwuans insuficientes.');
+    user.coins = coins() - price;
+    user.inventory = inv();
+    user.inventory.push({ id:`${kind}:${item.id||id}`, itemId:`${kind}:${item.id||id}`, type:kind, name:item.name||kind, desc:item.desc||'', url:item.url||item.value||'', value:item.url||item.value||'', price, duration:durationLabel(dur), size:item.size||32, boughtAt:Date.now() });
+    await save('Item comprado!');
+    await cleanInventoryFromDeletedAdmin();
+    window.renderShop(); window.renderInventory();
+  }
+
+  document.addEventListener('change', e => {
+    const sel = e.target.closest('.lex-final-price-duration'); if(!sel) return;
+    const cardEl = sel.closest('.zyo-item-card'); const kind = cardEl?.dataset.productKind; const id = cardEl?.dataset.productId; const item = findProduct(kind,id); const lab = cardEl?.querySelector('[data-price-label]');
+    if(lab && item) lab.textContent = priceFor(item, sel.value) + ' Linkwuans';
+  }, true);
+  document.addEventListener('click', e => {
+    const tab = e.target.closest('[data-shop-tab]'); if(tab){ setMode(tab.dataset.shopTab); setTimeout(() => window.renderShop(),0); }
+    const b = e.target.closest('[data-lex-final-buy]'); if(b){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return buy(b.dataset.lexFinalBuy, b.dataset.lexFinalId); }
   }, true);
 
-  // Modal único de compra mais próximo do Zyo, sem duplicar.
-  function openBuyModal(card){
-    document.querySelectorAll('#lexBuyModalFinal,#dlinkyConfirmPurchaseModal').forEach(x=>x.remove());
-    const name=card?.querySelector('h3,b')?.textContent?.trim()||'Item';
-    const price=card?.querySelector('[data-price-label],.zyo-price b')?.textContent?.trim()||'0 Linkwuans';
-    const dur=card?.querySelector('select')?.selectedOptions?.[0]?.textContent||'Permanente';
-    const img=card?.querySelector('.zyo-item-top img,.lex-shop-frame-preview img,.lex-effect-shop-preview img,.lex-inv-selo-preview img');
-    const bg=card?.querySelector('.lex-effect-shop-preview,.zyo-effect-banner-preview');
-    const url=img?.src || (bg&&getComputedStyle(bg).backgroundImage.replace(/^url\(["']?/,'').replace(/["']?\)$/,'')) || '';
-    document.body.insertAdjacentHTML('beforeend',`<div id="lexBuyModalFinal" class="modal show"><div class="modal-card lex-buy-card-final"><button class="modal-close" id="lexBuyCloseFinal">×</button><h2>Confirmar compra</h2><p>Revise os detalhes antes de concluir.</p><div class="lex-buy-preview-final"><div class="lex-buy-img-final">${url?`<img src="${safe(url)}">`:'✦'}</div><strong>${esc(window.user?.name||'Usuário')}</strong></div><div class="lex-buy-info-final"><div><span>Item</span><b>${esc(name)}</b></div><div><span>Duração</span><b>${esc(dur)}</b></div><div><span>Preço</span><b>${esc(price)}</b></div></div><small>Esta ação consumirá seus Linkwuans. Confirma prosseguir?</small><div class="dlinky-buy-actions"><button class="btn dark" id="lexBuyCancelFinal">Cancelar</button><button class="btn primary" id="lexBuyOkFinal">Comprar</button></div></div></div>`);
-    $('#lexBuyCloseFinal').onclick=$('#lexBuyCancelFinal').onclick=()=>$('#lexBuyModalFinal')?.remove();
-    return $('#lexBuyOkFinal');
-  }
-  document.addEventListener('click',function(e){
-    const b=e.target.closest('[data-buy-lex2-frame],[data-buy-lex2-effect],[data-buy-lex2-selo]');
-    if(!b) return;
-    e.preventDefault(); e.stopImmediatePropagation();
-    const ok=openBuyModal(b.closest('.zyo-item-card'));
-    ok.onclick=()=>{ $('#lexBuyModalFinal')?.remove(); setTimeout(()=>b.click(),0); };
-  },true);
+  async function boot(){ await loadAdminStrict(); await cleanInventoryFromDeletedAdmin(); try{ window.renderShop(); }catch(e){} try{ window.renderInventory(); }catch(e){} }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  setTimeout(boot, 1500);
+})();
 
-  setTimeout(async()=>{ await cleanCurrentInventory(); try{window.renderInventory()}catch(e){} },1200);
+/* === LEXVOID FINAL HOTFIX: botão voltar só dono + créditos TikTok + selos sincronizados com admin === */
+(function(){
+  const TIKTOK_URL = 'https://www.tiktok.com/@stermylovee?_r=1&_t=ZS-96T7TI02xNc';
+  const q = (s,r=document)=>r.querySelector(s);
+  const qa = (s,r=document)=>Array.from(r.querySelectorAll(s));
+  const norm = v => String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9:/._-]+/g,'');
+  const dbx = () => { try { return firebase.firestore(); } catch(e) { return null; } };
+  const inv = () => Array.isArray(window.user?.inventory) ? window.user.inventory : (window.user ? (window.user.inventory=[]) : []);
+  const save = async () => { try { if(typeof saveUser === 'function') await saveUser('Inventário atualizado.'); } catch(e){} };
+  let adminSelosLive = [];
+  let syncDone = false;
+
+  function fixCredits(){
+    qa('.madeby,.dlinky-hud-credit,.lex-credit-link').forEach(el=>{
+      if(el.tagName !== 'A'){
+        const a=document.createElement('a');
+        a.className = (el.className||'') + ' lex-credit-link';
+        a.href=TIKTOK_URL; a.target='_blank'; a.rel='noopener';
+        a.innerHTML=el.innerHTML || '💜 Feito por LexVoid';
+        el.replaceWith(a);
+      }else{
+        el.href=TIKTOK_URL; el.target='_blank'; el.rel='noopener';
+      }
+    });
+  }
+
+  function isOwner(){
+    try{
+      const au = firebase.auth().currentUser;
+      if(!au || !window.user) return false;
+      return (user.uid && au.uid === user.uid) || (user.email && au.email && String(user.email).toLowerCase() === String(au.email).toLowerCase());
+    }catch(e){ return false; }
+  }
+  function fixBackButton(){
+    const btn = q('#backToDash');
+    if(!btn) return;
+    const owner = isOwner();
+    btn.style.display = owner ? '' : 'none';
+    btn.hidden = !owner;
+  }
+
+  function adminSeloKeys(){
+    return adminSelosLive.flatMap(s=>[s.id,s.itemId,s.seloId,s.url,s.value,s.name].map(norm)).filter(Boolean);
+  }
+  function isSelo(it){ const t=norm(it?.type); return t==='selo' || t==='seal'; }
+  function seloStillExists(it){
+    if(!isSelo(it)) return true;
+    const keys = adminSeloKeys();
+    if(!keys.length) return false;
+    const vals=[it.id,it.itemId,it.seloId,it.url,it.value,it.name].map(norm).filter(Boolean);
+    return vals.some(v => keys.includes(v) || keys.includes(v.replace(/^selo:/,'')) || vals.includes('selo:'+v));
+  }
+  async function loadSelos(){
+    const db = dbx();
+    if(!db) return;
+    try{
+      const snap = await db.collection('adminSelos').get();
+      adminSelosLive = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      window.__lexAdminSelosStrict = adminSelosLive;
+      window.__lexAdminSelosShop = adminSelosLive;
+    }catch(e){}
+  }
+  async function syncDeletedSelos(){
+    if(!window.user) return;
+    await loadSelos();
+    const before = inv().length;
+    const kept = inv().filter(seloStillExists);
+    if(kept.length !== before){
+      window.user.inventory = kept;
+      if(Array.isArray(window.user.selos)) window.user.selos = window.user.selos.filter(seloStillExists);
+      await save();
+    }
+    syncDone = true;
+  }
+
+  const oldRenderInventory = window.renderInventory;
+  window.renderInventory = async function(){
+    if(!syncDone) await syncDeletedSelos();
+    if(typeof oldRenderInventory === 'function') oldRenderInventory.apply(this, arguments);
+  };
+  try{ renderInventory = window.renderInventory; }catch(e){}
+
+  const oldRenderProfile = window.renderProfile;
+  window.renderProfile = function(){
+    if(typeof oldRenderProfile === 'function') oldRenderProfile.apply(this, arguments);
+    fixBackButton();
+    fixCredits();
+  };
+  try{ renderProfile = window.renderProfile; }catch(e){}
+
+  document.addEventListener('click', e=>{
+    const credit = e.target.closest('.madeby,.dlinky-hud-credit,.lex-credit-link');
+    if(credit){ credit.setAttribute('href', TIKTOK_URL); credit.setAttribute('target','_blank'); }
+  }, true);
+
+  async function boot(){
+    fixCredits();
+    fixBackButton();
+    await syncDeletedSelos();
+    try{ if(q('#inventoryGrid')) await window.renderInventory(); }catch(e){}
+    try{ if(q('#profileCard')) window.renderProfile(); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  setTimeout(boot, 1200);
 })();
