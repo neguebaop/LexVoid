@@ -81,8 +81,9 @@
         <a class="side-link" data-tab="links">🔗 Editar Links</a><a class="side-link" data-tab="socials">☍ Ícones Sociais</a><a class="side-link" data-tab="embeds">▣ Embeds</a><a class="side-link" data-tab="assets">▣ Linky Assets</a>
       </div></div>
       <div class="side-group open"><button class="side-title">⚙ Conta <span>⌄</span></button><div class="side-items">
-        <a class="side-link" data-tab="payments">▣ Pagamentos</a><a class="side-link" data-tab="inventory">▦ Inventário</a><a class="side-link" data-tab="history">◷ Histórico</a><a class="side-link admin-only" data-tab="admin" style="display:none">⚜ Admin</a>
+        <a class="side-link" data-tab="inventory">▦ Inventário</a><a class="side-link" data-tab="history">◷ Histórico</a><a class="side-link admin-only" data-tab="admin" style="display:none">⚜ Admin</a>
 <a class="side-link admin-only" data-tab="adminSelos" style="display:none">🏷 Admin Selos</a>
+<a class="side-link admin-only" data-tab="adminEffects" style="display:none">✨ Admin Efeitos</a>
       </div></div>
       <div class="side-user"><span class="avatar tiny" id="sideAvatar"></span><div><b id="sideName">usuário</b><small id="sideUrl">lexvoid/usuario</small></div></div>
     </aside>
@@ -117,7 +118,35 @@
 
       <section class="dash-tab" id="tab-uploads"><div class="panel hero-panel"><h1>Ativos</h1><p>Atalhos para enviar/colar URLs de avatar, background, cursor e áudio.</p></div><div class="panel form-panel"><div class="upload-grid"><label>Avatar URL<input id="uploadAvatar"><div class="drop">☁ PNG/JPG/GIF</div></label><label>Background URL<input id="uploadBg"><div class="drop">☁ Imagem, GIF ou MP4</div></label><label>Cursor URL<input id="uploadCursor"><div class="drop">☁ .cur ou .png</div></label><label>Áudio URL<input id="uploadMusic"><div class="drop">☁ .mp3/.ogg</div></label></div><button class="btn primary" id="saveUploads">Enviar</button></div></section>
 
-      <section class="dash-tab" id="tab-custom"><div class="panel hero-panel"><h1>Customização</h1><p>Atualize nome, bio e efeitos extras sem mexer no layout geral.</p></div><div class="grid2"><div class="panel form-panel"><h2>Conteúdo e identidade</h2><label>Nome<input id="customName"></label><label>Biografia<textarea id="customBio"></textarea></label><label>Efeito de fundo<select id="customBgFx"><option value="none">Sem efeito</option><option value="radial">Radial roxo</option><option value="scan">Scanline</option><option value="grain">Ruído/Grão</option></select></label><button class="btn primary" id="saveCustom">Enviar</button></div><div class="panel form-panel"><h2>Efeitos</h2><label class="check"><input id="fxNeonName" type="checkbox"> Neon no nome</label><label class="check"><input id="fxShineName" type="checkbox"> Brilho no nome</label><label class="check"><input id="fxRainbowName" type="checkbox"> Nome colorido</label><label class="check"><input id="fxPerspective" type="checkbox"> Efeito perspectiva no card</label></div></div></section>
+      <section class="dash-tab" id="tab-custom">
+        <div class="panel hero-panel"><h1>Customização</h1><p>Nome, bio, opacidade, blur, glow e efeitos do card.</p></div>
+        <div class="grid2">
+          <div class="panel form-panel"><h2>Conteúdo e identidade</h2>
+            <label>Nome<input id="customName"></label>
+            <label>Biografia<textarea id="customBio"></textarea></label>
+            <label>Efeito de fundo<select id="customBgFx"><option value="none">Sem efeito</option><option value="radial">Radial roxo</option><option value="scan">Scanline</option><option value="grain">Ruído/Grão</option><option value="stars">Estrelas suaves</option><option value="voidpulse">Pulso Void</option></select></label>
+            <div class="custom-control-grid">
+              <label>Cor do glow<input id="fxGlowColor" type="color" value="#8b5cf6"></label>
+              <label>Opacidade do card<input id="fxCardOpacity" type="range" min="35" max="100" value="72"></label>
+              <label>Blur do card<input id="fxCardBlur" type="range" min="0" max="30" value="14"></label>
+              <label>Opacidade do banner<input id="fxBannerOpacity" type="range" min="20" max="100" value="100"></label>
+            </div>
+            <button class="btn primary" id="saveCustom">Salvar customização</button>
+          </div>
+          <div class="panel form-panel"><h2>Efeitos</h2>
+            <label class="check"><input id="fxNeonName" type="checkbox"> Neon no nome</label>
+            <label class="check"><input id="fxShineName" type="checkbox"> Brilho no nome</label>
+            <label class="check"><input id="fxRainbowName" type="checkbox"> Nome colorido</label>
+            <label class="check"><input id="fxPerspective" type="checkbox"> Card acompanha o mouse</label>
+            <label class="check"><input id="fxGlowCard" type="checkbox"> Glow no card</label>
+            <label class="check"><input id="fxPulseCard" type="checkbox"> Pulso sombrio</label>
+            <label class="check"><input id="fxBorderRun" type="checkbox"> Borda animada</label>
+            <label class="check"><input id="fxFloatCard" type="checkbox"> Card flutuante</label>
+            <label class="check"><input id="fxAvatarPulse" type="checkbox"> Avatar pulsando</label>
+            <label class="check"><input id="fxBannerShine" type="checkbox"> Brilho no banner</label>
+          </div>
+        </div>
+      </section>
 
       
 
@@ -340,6 +369,20 @@
 
   <div id="paymentModal" class="modal"><div class="modal-card"><button class="modal-close" id="closePayment">×</button><h2>Pagamento PIX</h2><p id="payDesc">Finalize a compra pelo QR Code.</p><label>Copia e cola PIX<input id="pixCode" readonly></label><button class="btn primary full" id="copyPix">Copiar código PIX</button></div></div>
 
+
+      <section class="dash-tab" id="tab-adminEffects">
+        <div class="panel hero-panel"><h1>Admin Efeitos</h1><p>Cadastre efeitos de banner para vender na loja. Eles aparecem na aba Efeitos.</p></div>
+        <div class="grid2">
+          <div class="panel form-panel"><h2>Adicionar efeito de banner</h2>
+            <label>Nome do efeito<input id="adminEffectName" placeholder="Efeito Raios"></label>
+            <label>Descrição<input id="adminEffectDesc" placeholder="Raios animados no banner"></label>
+            <label>Preço em Linkwuans<input id="adminEffectPrice" type="number" placeholder="20"></label>
+            <label>URL/arquivo GIF/PNG/WebP<input id="adminEffectUrl" placeholder="assets/efeitos/raios.gif ou https://site.com/efeito.gif"></label>
+            <button class="btn primary" id="adminAddEffect">Adicionar efeito</button>
+          </div>
+          <div class="panel"><h2>Efeitos cadastrados</h2><div id="adminEffectsList" class="admin-list"></div></div>
+        </div>
+      </section>
   <section id="profile" class="page profile-page">
     <div class="madeby">💜 Feito por LexVoid</div><button class="sound-btn" id="soundBtn">🔈</button>
     <div class="entry-overlay" id="entryOverlay"><h1 id="welcomeText">Clique aqui</h1><span>✧</span></div>
