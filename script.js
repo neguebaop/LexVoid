@@ -3312,3 +3312,159 @@ loadLandingFeatured();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   setTimeout(boot, 1200);
 })();
+
+/* === LEXVOID FINAL SAFE PATCH: loja/admin online + inventário sincronizado sem quebrar === */
+(function(){
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const safe = v => String(v || '').trim().replace(/"/g,'%22').replace(/'/g,'%27');
+  const norm = v => String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(frame|effect|selo|seal|moldura|efeito):/,'').replace(/[^a-z0-9:/._-]+/g,'');
+  const db = () => { try { return firebase.firestore(); } catch(e) { return null; } };
+  const inv = () => Array.isArray(window.user?.inventory) ? window.user.inventory : (window.user ? (window.user.inventory=[]) : []);
+  const toastx = m => { try { toast(m); } catch(e){ console.log(m); } };
+  const save = async m => { try { if(typeof saveUser === 'function') await saveUser(m || 'Salvo!'); } catch(e){} };
+
+  window.__lvAdmin = window.__lvAdmin || {frames:[], effects:[], selos:[], loaded:false, loading:false};
+
+  function itemType(it){
+    const t = norm(it?.type);
+    if(t.includes('frame') || t.includes('moldura')) return 'frame';
+    if(t.includes('effect') || t.includes('efeito') || t.includes('banner')) return 'effect';
+    if(t.includes('selo') || t.includes('seal')) return 'selo';
+    if(t.includes('badge') || t.includes('insign')) return 'badge';
+    return t || 'other';
+  }
+  function keys(o){
+    return [o?.id,o?.itemId,o?.frameId,o?.effectId,o?.seloId,o?.url,o?.value,o?.frame,o?.name]
+      .map(norm).filter(Boolean).flatMap(x=>[x,x.replace(/^(frame|effect|selo):/,'')]);
+  }
+  function same(a,b){ const ak=keys(a), bk=keys(b); return ak.some(x=>bk.includes(x)); }
+  function list(kind){
+    if(kind==='frame') return window.__lvAdmin.frames.length ? window.__lvAdmin.frames : (Array.isArray(window.customFrames)?window.customFrames:[]);
+    if(kind==='effect') return window.__lvAdmin.effects.length ? window.__lvAdmin.effects : (window.__lexAdminEffectsStrict||window.__lexAdminEffectsShop||[]);
+    if(kind==='selo') return window.__lvAdmin.selos.length ? window.__lvAdmin.selos : (window.__lexAdminSelosStrict||window.__lexAdminSelosShop||window.adminSelos||[]);
+    return [];
+  }
+  function findAdmin(kind,itOrId){
+    const obj = typeof itOrId === 'object' ? itOrId : {id:String(itOrId), itemId:String(itOrId)};
+    return list(kind).find(a => same(obj,a) || String(a.id||'') === String(itOrId) || norm(a.name)===norm(obj.name));
+  }
+  function hydrate(it){
+    const k=itemType(it); const adm=findAdmin(k,it);
+    return adm ? {...adm, ...it, url: it.url || it.value || adm.url || adm.value || '', value: it.value || it.url || adm.value || adm.url || '', name: it.name || adm.name, desc: it.desc || adm.desc, price: it.price || adm.price, prices: it.prices || adm.prices, size: it.size || adm.size} : it;
+  }
+  function existsInAdmin(it){ const k=itemType(it); if(!['frame','effect','selo'].includes(k)) return true; return !!findAdmin(k,it); }
+
+  async function loadAdminOnline(force=false){
+    const f=db(); if(!f || (window.__lvAdmin.loading && !force)) return;
+    window.__lvAdmin.loading = true;
+    try{
+      const [fr,ef,se] = await Promise.all([
+        f.collection('adminFrames').orderBy('createdAt','desc').get().catch(()=>null),
+        f.collection('adminEffects').orderBy('createdAt','desc').get().catch(()=>null),
+        f.collection('adminSelos').orderBy('createdAt','desc').get().catch(()=>null)
+      ]);
+      window.__lvAdmin.frames = fr ? fr.docs.map(d=>({id:d.id,type:'frame',...d.data()})) : list('frame');
+      window.__lvAdmin.effects = ef ? ef.docs.map(d=>({id:d.id,type:'effect',...d.data()})) : list('effect');
+      window.__lvAdmin.selos = se ? se.docs.map(d=>({id:d.id,type:'selo',...d.data()})) : list('selo');
+      window.customFrames = window.__lvAdmin.frames;
+      window.__lexAdminFramesStrict = window.__lvAdmin.frames;
+      window.__lexAdminEffectsStrict = window.__lvAdmin.effects; window.__lexAdminEffectsShop = window.__lvAdmin.effects; window.__lexAdminEffects = window.__lvAdmin.effects;
+      window.__lexAdminSelosStrict = window.__lvAdmin.selos; window.__lexAdminSelosShop = window.__lvAdmin.selos; window.adminSelos = window.__lvAdmin.selos;
+      window.__lvAdmin.loaded = true;
+    } finally { window.__lvAdmin.loading = false; }
+  }
+  window.lexLoadAdminOnline = loadAdminOnline;
+
+  function priceMap(item){
+    const p=item?.prices||item?.priceMap||item?.durations||{}; const base=Number(item?.price||p.d3||p['3']||p.three||10);
+    return {d3:Number(p.d3??p['3']??base), d7:Number(p.d7??p['7']??Math.ceil(base*1.5)), d15:Number(p.d15??p['15']??Math.ceil(base*2.5)), d30:Number(p.d30??p['30']??Math.ceil(base*4)), perm:Number(p.perm??p.permanent??p.permanente??Math.ceil(base*8))};
+  }
+  function priceFor(item,dur){ const p=priceMap(item); return Number(p[dur] ?? p.d3 ?? item?.price ?? 0); }
+  function durationLabel(d){ return ({d3:'3 dias',d7:'7 dias',d15:'15 dias',d30:'30 dias',perm:'Permanente',0:'Permanente'})[d] || '3 dias'; }
+  function mode(){ try { return window.shopMode || shopMode; } catch(e){ return $('.shop-tabs button.active')?.dataset.shopTab || 'coins'; } }
+  function setMode(v){ try{ window.shopMode=v; shopMode=v; }catch(e){ window.shopMode=v; } }
+  function avatar(){ try { return getBestAvatar() || window.user?.avatar || ''; } catch(e){ return window.user?.avatar || ''; } }
+  function owned(kind,item){ return inv().some(it => itemType(it)===kind && same(it,item)); }
+  function preview(kind,item){
+    const u = item?.url || item?.value || '';
+    if(kind==='frame') return `<div class="lex-shop-frame-preview"><span class="lex-shop-avatar" style="background-image:url('${safe(avatar())}')"></span>${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:''}</div>`;
+    if(kind==='effect') return `<div class="lex-effect-shop-preview" style="background-image:url('${safe(u)}')"></div>`;
+    return `<div class="lex-selo-shop-preview">${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:'🏷️'}</div>`;
+  }
+  function durationSelect(kind,id){ return `<select class="zyo-duration lv-duration" data-kind="${esc(kind)}" data-id="${esc(id)}"><option value="d3">3 dias</option><option value="d7">7 dias</option><option value="d15">15 dias</option><option value="d30">30 dias</option><option value="perm">Permanente</option></select>`; }
+  function shopCard(kind,item){
+    const id=String(item.id||item.url||item.name||''); const bought=owned(kind,item); const p=priceFor(item,'d3');
+    const title=kind==='frame'?'Moldura':kind==='effect'?'Efeito':'Selo';
+    const note=kind==='frame'?'ⓘ Valor muda conforme a duração escolhida.':kind==='effect'?'ⓘ Aplica no banner do perfil.':'ⓘ Use pelo inventário depois da compra.';
+    return `<div class="zyo-item-card ${bought?'owned':''}" data-lv-kind="${kind}" data-lv-id="${esc(id)}"><div class="zyo-item-top">${preview(kind,item)}<div><h3>${esc(item.name||title)}</h3><p>${esc(item.desc||'')}</p>${bought?'<span class="owned-badge">✓ Já comprado</span>':''}</div></div><div class="zyo-price">▣ Preço do item: <b data-price-label>${p} Linkwuans</b></div>${durationSelect(kind,id)}<small class="zyo-note">${note}</small><div class="zyo-card-actions"><button class="btn primary small" type="button" data-lv-buy="${kind}" data-lv-id="${esc(id)}" ${bought?'disabled':''}>🔒 ${bought?'Já comprado':'Comprar'}</button><button class="btn dark small" type="button" data-lv-gift="${kind}" data-lv-id="${esc(id)}">🎁 Presentear</button></div></div>`;
+  }
+  function ensureShopTabs(){ const tabs=$('.shop-tabs'); if(!tabs) return; if(!tabs.querySelector('[data-shop-tab="selos"]')){ const b=document.createElement('button'); b.type='button'; b.dataset.shopTab='selos'; b.textContent='Selos'; const other=tabs.querySelector('[data-shop-tab="other"]'); (other||tabs).insertAdjacentElement(other?'beforebegin':'beforeend',b); } }
+
+  const oldShop = window.renderShop || (typeof renderShop==='function'?renderShop:null);
+  window.renderShop = function(){
+    ensureShopTabs();
+    const grid=$('#shopGrid'); const m=mode();
+    if(!window.__lvAdmin.loaded) loadAdminOnline().then(()=>{ try{window.renderShop()}catch(e){}; try{window.renderInventory()}catch(e){}; });
+    if(!grid){ if(oldShop) oldShop(); return; }
+    $$('.shop-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.shopTab===m));
+    if(m==='frames') { const arr=list('frame'); grid.className='zyo-shop-grid'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Molduras</h2><p>Destaque-se com molduras exclusivas no seu perfil.</p></div>`+(arr.length?arr.map(x=>shopCard('frame',x)).join(''):'<p>Nenhuma moldura cadastrada pelo admin ainda.</p>'); return; }
+    if(m==='effects') { const arr=list('effect'); grid.className='zyo-shop-grid'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Efeitos</h2><p>Efeitos de banner cadastrados pelo admin.</p></div>`+(arr.length?arr.map(x=>shopCard('effect',x)).join(''):'<p>Nenhum efeito cadastrado pelo admin ainda.</p>'); return; }
+    if(m==='selos') { const arr=list('selo'); grid.className='zyo-shop-grid'; grid.innerHTML=`<div class="zyo-shop-title"><h2>Selos</h2><p>Selos cadastrados pelo admin para aparecer ao lado do nome.</p></div>`+(arr.length?arr.map(x=>shopCard('selo',x)).join(''):'<p>Nenhum selo cadastrado pelo admin ainda.</p>'); return; }
+    if(m==='other') { grid.className='zyo-shop-grid'; grid.innerHTML='<div class="zyo-shop-title"><h2>Outros</h2><p>Itens extras ficarão disponíveis aqui.</p></div>'; return; }
+    if(oldShop) oldShop();
+  };
+  try{ renderShop=window.renderShop; }catch(e){}
+
+  function currentInvFilter(){ try{return window.inventoryFilter || inventoryFilter;}catch(e){return $('#inventoryTabs button.active')?.dataset.invFilter || 'todos';} }
+  function pass(it){ const f=norm(currentInvFilter()), t=itemType(it); if(['todos','all','tudo'].includes(f)) return true; if(['molduras','frames','frame'].includes(f)) return t==='frame'; if(['efeitos','effects','effect'].includes(f)) return t==='effect'; if(['selos','selo'].includes(f)) return t==='selo'; if(['insignias','insignia','badges','badge'].includes(f)) return t==='badge'; if(['presentes','gifts'].includes(f)) return !!it.gift; return true; }
+  function invPrev(it){ it=hydrate(it); const t=itemType(it); const u=it.url||it.value||''; if(t==='frame') return preview('frame',it); if(t==='effect') return `<div class="asset-preview lex-inv-effect-preview" style="background-image:url('${safe(u)}')"></div>`; if(t==='selo') return `<div class="asset-preview lex-inv-selo-preview">${u?`<img src="${safe(u)}" onerror="this.style.display='none'">`:'🏷️'}</div>`; return '<div class="asset-preview">✦</div>'; }
+  window.renderInventory = function(){
+    const grid=$('#inventoryGrid'); if(!grid) return;
+    if(!window.__lvAdmin.loaded) loadAdminOnline(true).then(()=>{ try{window.renderInventory()}catch(e){}; });
+    if($('#invCoins')) $('#invCoins').textContent=Number(window.user?.coins||0);
+    const all=inv().map(hydrate).filter(it => !window.__lvAdmin.loaded || existsInAdmin(it));
+    if($('#invItemsCount')) $('#invItemsCount').textContent=all.length;
+    $$('#inventoryTabs button').forEach(b=>b.classList.toggle('active', norm(b.dataset.invFilter)===norm(currentInvFilter())));
+    const items=all.map(it=>({it,i:inv().findIndex(x=>same(x,it)||x===it)})).filter(x=>pass(x.it));
+    if(!items.length){ grid.innerHTML='<p>Nenhum item nessa categoria.</p>'; return; }
+    grid.innerHTML=items.map(({it,i})=>{ const t=itemType(it); return `<div class="asset-card inv-item-card lex-inv-card"><div class="lex-inv-preview-wrap">${invPrev(it)}</div><div class="asset-body"><b>${esc(it.name||'Item')}</b><small>${esc(t)}</small>${t==='frame'?`<button class="btn primary small" type="button" data-use-inv-frame="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-inv-frame="${i}">Ajustar</button>`:''}${t==='effect'?`<button class="btn primary small" type="button" data-use-lex2-effect="${i}">Usar</button>`:''}${t==='selo'?`<button class="btn primary small" type="button" data-use-lex2-selo="${i}">Usar</button><button class="btn dark small" type="button" data-adjust-lex2-selo="${i}">Ajustar</button>`:''}<button class="btn dark small" type="button" data-remove-lex2-profile="${i}">Remover do perfil</button></div></div>`; }).join('');
+  };
+  try{ renderInventory=window.renderInventory; }catch(e){}
+
+  function findProduct(kind,id){ return list(kind).find(x=>String(x.id||x.url||x.name)===String(id) || same(x,{id,itemId:id,type:kind})); }
+  function openBuyModal(kind,id){
+    const item=findProduct(kind,id); if(!item) return toastx('Item não encontrado.');
+    const cardEl=document.querySelector(`.zyo-item-card[data-lv-kind="${CSS.escape(kind)}"][data-lv-id="${CSS.escape(String(id))}"]`);
+    const dur=cardEl?.querySelector('.lv-duration')?.value||'d3'; const price=priceFor(item,dur);
+    document.querySelector('#lvBuyModal')?.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div id="lvBuyModal" class="modal show"><div class="modal-card lex-buy-card"><button class="modal-close" data-lv-close-buy>×</button><h2>Confirmar compra</h2><p>Revise os detalhes antes de concluir.</p><div class="buy-preview"><b>PRÉ-VISUALIZAÇÃO</b><div>${preview(kind,item)}<strong>${esc(window.user?.name||window.user?.slug||'usuário')}</strong></div></div><div class="buy-info"><div><span>Item</span><b>${esc(item.name||'Item')}</b></div><div><span>Duração</span><b>${durationLabel(dur)}</b></div><div><span>Tipo</span><b>${kind==='frame'?'Moldura':kind==='effect'?'Efeito':'Selo'}</b></div><div><span>Preço</span><b>${price} Linkwuans</b></div></div><div class="modal-actions"><button class="btn dark" data-lv-close-buy>Cancelar</button><button class="btn primary" data-lv-confirm-buy="${esc(kind)}" data-lv-id="${esc(id)}" data-lv-duration="${esc(dur)}">Comprar</button></div></div></div>`);
+  }
+  async function buy(kind,id,dur){
+    const item=findProduct(kind,id); if(!item) return toastx('Item não encontrado.');
+    if(owned(kind,item)) return toastx('Você já comprou esse item.');
+    const price=priceFor(item,dur||'d3'); if(Number(window.user?.coins||0)<price) return toastx('Linkwuans insuficientes.');
+    window.user.coins=Number(window.user.coins||0)-price;
+    inv().push({id:`${kind}:${item.id||id}`,itemId:`${kind}:${item.id||id}`,type:kind,name:item.name||kind,desc:item.desc||'',url:item.url||item.value||'',value:item.url||item.value||'',price,duration:durationLabel(dur||'d3'),prices:item.prices||null,size:item.size||32,boughtAt:Date.now()});
+    await save('Item comprado!'); document.querySelector('#lvBuyModal')?.remove(); window.renderShop(); window.renderInventory();
+  }
+  function openGift(meta){
+    document.querySelectorAll('#lexGiftOne,#lexGiftModal,#dlinkyGiftModal').forEach(x=>x.remove());
+    document.body.insertAdjacentHTML('beforeend',`<div id="lexGiftOne" class="modal show"><div class="modal-card lex-gift-card"><button class="modal-close" id="giftCloseOne">×</button><h2>Enviar presente</h2><p>Escolha o destinatário e confirme o envio.</p><div class="gift-summary"><div><span>Item</span><b>${esc(meta.name||'Item')}</b></div><div><span>Duração</span><b>${esc(meta.duration||'Permanente')}</b></div><div><span>Preço</span><b>${esc(meta.price||'0 Linkwuans')}</b></div></div><label>Destinatário <input id="giftRecipientOne" placeholder="@slug ou email"></label><label>Mensagem opcional<textarea id="giftMessageOne" maxlength="100" placeholder="Mensagem para quem receber"></textarea></label><button class="btn primary full" id="giftConfirmOne">🎁 Presentear</button></div></div>`);
+    $('#giftCloseOne').onclick=()=>$('#lexGiftOne')?.remove(); $('#giftConfirmOne').onclick=()=>{ if(!$('#giftRecipientOne')?.value.trim()) return toastx('Digite o destinatário.'); toastx('Presente preparado.'); $('#lexGiftOne')?.remove(); };
+  }
+
+  document.addEventListener('change',e=>{ const sel=e.target.closest('.lv-duration'); if(!sel) return; const card=sel.closest('.zyo-item-card'); const item=findProduct(card?.dataset.lvKind, card?.dataset.lvId); const lab=card?.querySelector('[data-price-label]'); if(item&&lab) lab.textContent=priceFor(item,sel.value)+' Linkwuans'; },true);
+  document.addEventListener('click',e=>{
+    const tab=e.target.closest('[data-shop-tab]'); if(tab){ setMode(tab.dataset.shopTab); setTimeout(()=>window.renderShop(),0); }
+    const b=e.target.closest('[data-lv-buy]'); if(b){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return openBuyModal(b.dataset.lvBuy,b.dataset.lvId); }
+    const c=e.target.closest('[data-lv-confirm-buy]'); if(c){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return buy(c.dataset.lvConfirmBuy,c.dataset.lvId,c.dataset.lvDuration); }
+    if(e.target.closest('[data-lv-close-buy]')){ e.preventDefault(); document.querySelector('#lvBuyModal')?.remove(); }
+    const g=e.target.closest('[data-lv-gift]'); if(g){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const item=findProduct(g.dataset.lvGift,g.dataset.lvId); if(item) openGift({name:item.name,price:(item.price||priceFor(item,'d3'))+' Linkwuans',duration:'Permanente'}); }
+  },true);
+
+  async function boot(){ await loadAdminOnline(true); try{window.renderShop()}catch(e){} try{window.renderInventory()}catch(e){} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  setTimeout(boot,900); setInterval(()=>loadAdminOnline(true).then(()=>{try{window.renderShop()}catch(e){};try{window.renderInventory()}catch(e){};}),30000);
+})();
