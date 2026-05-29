@@ -4761,3 +4761,18 @@ body:not(.lex-owner-profile) #profile #backToDash[data-force-hide="1"]{display:n
 body:not(:has(#profile.active)) #lexFallingParticles{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 #lexFallingParticles{pointer-events:none!important;z-index:1!important;}
 .admin-only:not(.show){display:none!important;}
+
+/* Hotfix final: esconder moldura quebrada/vazia quando o usuário não está usando moldura */
+#profileFrame:not([src]),
+#profileFrame[src=""],
+#profileFrame[src="null"],
+#profileFrame[src="undefined"],
+.profile-frame:not([src]),
+.profile-frame[src=""],
+.avatar-frame:not([src]),
+.avatar-frame[src=""]{
+  display:none!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  border:0!important;
+}
