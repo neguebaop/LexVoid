@@ -4796,3 +4796,36 @@ body:not(:has(#profile.active)) #lexFallingParticles{display:none!important;visi
 body:not(.profile-open) #lexFallingParticles{display:none!important;}
 #lexFallingParticles{display:none!important;}
 .wallet-icon,.inv-stat-icon,.store-stat-icon{border-radius:14px;background:linear-gradient(135deg,#2563eb,#7c3aed)!important;box-shadow:0 0 18px rgba(37,99,235,.35)!important;}
+
+/* ===== LEXVOID HOTFIX — sem quadrado/imagem quebrada quando não tem moldura ===== */
+#avatarDecoration.lex-no-frame > #profileFrame,
+#avatarDecoration.lex-no-frame > img:not(#profileAvatar),
+#profileFrame.lex-frame-broken,
+#profileFrame.dlinky-frame-broken,
+#profileFrame.dlinky-frame-off,
+#profileFrame:not([src]),
+#profileFrame[src=""],
+#profileFrame[src="null"],
+#profileFrame[src="undefined"]{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  width:0!important;
+  height:0!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  pointer-events:none!important;
+}
+#avatarDecoration.lex-no-frame{
+  overflow:visible!important;
+  background:transparent!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+}
+#avatarDecoration.lex-no-frame #profileAvatar{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
