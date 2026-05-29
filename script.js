@@ -3913,3 +3913,67 @@ loadLandingFeatured();
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{renderInventorySafe(); patchShopOwned(); renderInsignias();},1000));
   setInterval(()=>{ if($('#inventoryGrid')) renderInventorySafe(); patchShopOwned(); renderInsignias(); },2500);
 })();
+
+/* ===== LEXVOID HOTFIX — esconder moldura quebrada quando não está usando nenhuma ===== */
+(function(){
+  const $ = (s,r=document)=>r.querySelector(s);
+  function realFrameUrl(){
+    try{
+      const u = window.user || {};
+      return String(u.frame || u.frameUrl || u.activeFrame || '').trim();
+    }catch(e){ return ''; }
+  }
+  function hideBrokenFrameNow(){
+    try{
+      const dec = $('#avatarDecoration');
+      const frameUrl = realFrameUrl();
+      const hasFrame = !!frameUrl && !/^null$|^undefined$|^about:blank$/i.test(frameUrl);
+      const pf = $('#profileFrame');
+      if(dec){
+        dec.classList.toggle('has-img-frame', hasFrame);
+        dec.classList.toggle('lex-no-frame', !hasFrame);
+      }
+      if(pf){
+        pf.onerror = function(){
+          this.classList.add('lex-frame-broken','dlinky-frame-broken','dlinky-frame-off');
+          this.style.setProperty('display','none','important');
+          this.style.setProperty('visibility','hidden','important');
+          this.removeAttribute('src');
+        };
+        if(!hasFrame){
+          pf.classList.add('lex-frame-broken','dlinky-frame-broken','dlinky-frame-off');
+          pf.removeAttribute('src');
+          pf.style.setProperty('display','none','important');
+          pf.style.setProperty('visibility','hidden','important');
+          pf.style.setProperty('opacity','0','important');
+        }else{
+          pf.classList.remove('lex-frame-broken','dlinky-frame-broken','dlinky-frame-off','dlinky-frame-hidden');
+          if(pf.getAttribute('src') !== frameUrl) pf.src = frameUrl;
+          pf.style.setProperty('display','block','important');
+          pf.style.setProperty('visibility','visible','important');
+          pf.style.setProperty('opacity','1','important');
+        }
+      }
+      if(dec && !hasFrame){
+        dec.querySelectorAll('img:not(#profileAvatar)').forEach(img=>{
+          img.classList.add('lex-frame-broken');
+          img.removeAttribute('src');
+          img.style.setProperty('display','none','important');
+          img.style.setProperty('visibility','hidden','important');
+          img.style.setProperty('opacity','0','important');
+        });
+      }
+    }catch(e){}
+  }
+  const oldRender = window.renderProfile;
+  window.renderProfile = function(){
+    if(typeof oldRender === 'function') oldRender.apply(this, arguments);
+    hideBrokenFrameNow();
+    setTimeout(hideBrokenFrameNow, 80);
+    setTimeout(hideBrokenFrameNow, 350);
+  };
+  try{ if(typeof renderProfile !== 'undefined') renderProfile = window.renderProfile; }catch(e){}
+  document.addEventListener('DOMContentLoaded', hideBrokenFrameNow);
+  window.addEventListener('hashchange', ()=>setTimeout(hideBrokenFrameNow,120));
+  document.addEventListener('click', ()=>setTimeout(hideBrokenFrameNow,120), true);
+})();
