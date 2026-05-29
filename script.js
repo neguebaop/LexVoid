@@ -3550,3 +3550,154 @@ loadLandingFeatured();
   async function boot(){ensureTabs();ensureAdminInsignias();await loadAdmin();renderAdminInsignias(); if($('#shopGrid'))window.renderShop(); if($('#inventoryGrid'))window.renderInventory(); renderNameExtras(); applyBannerEffect(); renderFallingParticles();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot); else boot(); setTimeout(boot,1000); setInterval(renderFallingParticles,2500);
 })();
+
+/* === LEXVOID HOTFIX SEGURO: admin só dono, partículas só no perfil, conta nova limpa === */
+(function(){
+  const OWNER_EMAIL = 'jailtonsilas48@gmail.com';
+  const $ = (s,r=document)=>r.querySelector(s);
+  const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+  const clean = v => String(v||'').toLowerCase().trim();
+
+  function ownerEmail(){
+    try { return clean(firebase.auth().currentUser?.email || window.currentAuthUser?.email || window.user?.email); }
+    catch(e){ return clean(window.user?.email); }
+  }
+  function ownerOK(){ return ownerEmail() === OWNER_EMAIL; }
+
+  // trava REAL: só o e-mail dono vê ou abre qualquer área admin.
+  window.isAdmin = ownerOK;
+  try { isAdmin = ownerOK; } catch(e) {}
+
+  function lockAdmins(){
+    const ok = ownerOK();
+    $$('[data-tab="admin"],[data-tab="adminSelos"],[data-tab="adminEffects"],[data-tab="adminInsignias"],[data-nav="admin"],[data-nav="adminSelos"],[data-nav="adminEffects"],[data-nav="adminInsignias"],.admin-only')
+      .forEach(el=>{
+        el.classList.add('admin-only');
+        el.style.display = ok ? '' : 'none';
+        el.classList.toggle('show', ok);
+      });
+    const active = $('.side-link.active,.admin-only.active');
+    if(!ok && active && /admin/i.test(active.dataset.tab||active.dataset.nav||'')){
+      try { openTab('home'); } catch(e) {}
+    }
+  }
+  window.updateAdminVisibility = lockAdmins;
+  try { updateAdminVisibility = lockAdmins; } catch(e) {}
+
+  const oldOpenTab = window.openTab;
+  window.openTab = function(id){
+    if(/^admin/i.test(String(id||'')) && !ownerOK()){
+      try { toast('Área somente para admin.'); } catch(e) {}
+      return;
+    }
+    if(id === 'adminInsignias'){
+      $$('.dash-tab').forEach(x=>x.classList.remove('active'));
+      $$('.dash-tab').forEach(x=>{ if(x.id && x.id.startsWith('tab-')) x.style.display=''; });
+      $('#tab-adminInsignias')?.classList.add('active');
+      $$('.side-link').forEach(x=>x.classList.toggle('active', x.dataset.tab === id));
+      try { if(typeof renderAdminInsignias === 'function') renderAdminInsignias(); } catch(e) {}
+      lockAdmins();
+      return;
+    }
+    if(typeof oldOpenTab === 'function') oldOpenTab(id);
+    lockAdmins();
+  };
+  try { openTab = window.openTab; } catch(e) {}
+
+  // bloqueia clique capturado antes de qualquer handler antigo.
+  document.addEventListener('click', function(e){
+    const adminBtn = e.target.closest('[data-tab="admin"],[data-tab="adminSelos"],[data-tab="adminEffects"],[data-tab="adminInsignias"],[data-nav="admin"],[data-nav="adminSelos"],[data-nav="adminEffects"],[data-nav="adminInsignias"]');
+    if(adminBtn && !ownerOK()){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      try { toast('Área somente para admin.'); } catch(err) {}
+      return false;
+    }
+  }, true);
+
+  // remove qualquer overlay de partícula fora do Ver Perfil para não travar/clutter o dashboard.
+  function onlyProfileParticles(){
+    const profileActive = $('#profile')?.classList.contains('active');
+    if(!profileActive){
+      $('#lexFallingParticles')?.remove();
+      const pl = $('#profileParticleLayer');
+      if(pl) pl.innerHTML = '';
+    }
+    lockAdmins();
+  }
+  const oldRoute = window.route;
+  if(typeof oldRoute === 'function'){
+    window.route = async function(){
+      const r = await oldRoute.apply(this, arguments);
+      setTimeout(onlyProfileParticles, 30);
+      return r;
+    };
+    try { route = window.route; } catch(e) {}
+  }
+  const oldRenderDash = window.renderDash;
+  window.renderDash = function(){
+    if(typeof oldRenderDash === 'function') oldRenderDash.apply(this, arguments);
+    onlyProfileParticles();
+  };
+  try { renderDash = window.renderDash; } catch(e) {}
+
+  const oldCreate = window.createProfileParticles || (typeof createProfileParticles === 'function' ? createProfileParticles : null);
+  window.createProfileParticles = function(type){
+    if(!$('#profile')?.classList.contains('active')){
+      $('#lexFallingParticles')?.remove();
+      const layer = $('#profileParticleLayer'); if(layer) layer.innerHTML='';
+      return;
+    }
+    if(typeof oldCreate === 'function') oldCreate(type);
+  };
+  try { createProfileParticles = window.createProfileParticles; } catch(e) {}
+
+  // substitui a função extra que jogava estrelas/neve no dashboard.
+  window.renderFallingParticles = function(){
+    if(!$('#profile')?.classList.contains('active')){ $('#lexFallingParticles')?.remove(); return; }
+    const type = window.user?.particleType || 'none';
+    const enabled = window.user?.particles && type && type !== 'none';
+    if(!enabled){ $('#lexFallingParticles')?.remove(); return; }
+    let root = $('#lexFallingParticles');
+    if(!root){ root=document.createElement('div'); root.id='lexFallingParticles'; document.body.appendChild(root); }
+    const emoji = /snow|neve/i.test(type) ? '❄' : /raio|bolt/i.test(type) ? '⚡' : /rain|chuva/i.test(type) ? '╱' : /fire|fogo/i.test(type) ? '🔥' : /leaf|folha/i.test(type) ? '🍃' : /cat|gato/i.test(type) ? '🐾' : '✦';
+    const qty = Math.max(8, Math.min(120, Number(window.user?.particleCount || 45)));
+    if(root.dataset.kind === emoji && Number(root.dataset.qty||0) === qty) return;
+    root.dataset.kind = emoji; root.dataset.qty = String(qty); root.innerHTML='';
+    for(let i=0;i<qty;i++){
+      const s=document.createElement('span');
+      s.textContent=emoji;
+      s.style.left=(Math.random()*100)+'vw';
+      s.style.animationDelay=(-Math.random()*8)+'s';
+      s.style.animationDuration=(5+Math.random()*8)+'s';
+      s.style.fontSize=(10+Math.random()*18)+'px';
+      root.appendChild(s);
+    }
+  };
+
+  // conta nova sempre limpa: sem Sasuke, sem banner/bg/frame/music por padrão.
+  function cleanNewAccountObject(u){
+    return Object.assign({}, u, {
+      avatar:'', banner:'', bg:'', video:'', frame:'', decoration:'none', music:'', cursor:'',
+      particles:false, particleType:'none', bannerEffect:'', selos:[], insignias:[], inventory:[], links:[], socials:[], embeds:[],
+      tagSettings:{showFree:false, showDlinky:false, active:[]}
+    });
+  }
+  window.lexCleanNewAccountObject = cleanNewAccountObject;
+
+  // se uma conta nova caiu com avatar/banner padrão antigo, limpa uma única vez ANTES dela editar algo.
+  async function maybeCleanFreshDefault(){
+    try{
+      if(!firebase.auth().currentUser || !window.user?.uid) return;
+      const badAvatar = /pinimg|sasuke|originals\/74\/a6|originals\/55\/18/i.test(String(window.user.avatar||''));
+      const looksDefault = ['usuario','usuário'].includes(clean(window.user.name)) || clean(window.user.slug)==='usuario';
+      if(badAvatar && looksDefault){
+        Object.assign(window.user, cleanNewAccountObject(window.user));
+        await saveUser('Perfil inicial limpo.');
+      }
+    }catch(e){}
+  }
+  setTimeout(maybeCleanFreshDefault, 1500);
+  setInterval(onlyProfileParticles, 1200);
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{lockAdmins();onlyProfileParticles();},200));
+  setTimeout(()=>{lockAdmins();onlyProfileParticles();},800);
+})();
