@@ -3977,3 +3977,76 @@ loadLandingFeatured();
   window.addEventListener('hashchange', ()=>setTimeout(hideBrokenFrameNow,120));
   document.addEventListener('click', ()=>setTimeout(hideBrokenFrameNow,120), true);
 })();
+
+/* ===== LEXVOID FIX FINAL — selos sem duplicar + partículas fora do login ===== */
+(function(){
+  'use strict';
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const norm=v=>String(v||'').trim().toLowerCase();
+  const esc=s=>String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const safe=s=>String(s||'').replace(/"/g,'%22');
+
+  function onProfilePage(){
+    const p=$('#profile');
+    return !!(p && p.classList.contains('active')) || String(location.hash||'').startsWith('#/u/');
+  }
+  function clearParticleLayers(){
+    $$('#profileParticleLayer span,#profileParticleLayer .particle,.dlinky-final-particles,.dlinky-real-fall,.dlinky-particles-rain,.lexvoid-particle-layer,.lex-particle-layer,.lex-fall-particle').forEach(el=>{
+      const parentLayer = el.id==='profileParticleLayer' ? null : el.closest?.('#profileParticleLayer');
+      if(parentLayer) return;
+      try{ el.remove(); }catch(e){}
+    });
+    if(!onProfilePage()){
+      const layer=$('#profileParticleLayer');
+      if(layer) layer.innerHTML='';
+      $$('.dlinky-final-particles,.dlinky-real-fall,.dlinky-particles-rain,.lexvoid-particle-layer,.lex-particle-layer').forEach(x=>x.remove());
+    }
+  }
+
+  function uniqueSelos(arr){
+    const seen=new Set();
+    return (Array.isArray(arr)?arr:[]).filter(s=>{
+      const key=norm(s?.url||s?.value)+'|'+norm(s?.name);
+      if(!key || key==='|') return false;
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function renderSelosOnce(){
+    try{
+      if(!window.user) return;
+      const arr=uniqueSelos(window.user.selos);
+      window.user.selos=arr;
+      $$('.profile-selos,#profileName .lex-name-selo-wrap').forEach(x=>x.remove());
+      const name=$('#profileName');
+      if(!name || !arr.length) return;
+      const wrap=document.createElement('span');
+      wrap.className='lex-name-selo-wrap';
+      wrap.innerHTML=arr.map(s=>`<img title="${esc(s.name||'Selo')}" src="${safe(s.url||s.value||'')}" style="width:${Number(s.size||24)}px;height:${Number(s.size||24)}px;object-fit:contain">`).join('');
+      name.appendChild(wrap);
+    }catch(e){}
+  }
+
+  const oldCreate=window.createProfileParticles;
+  window.createProfileParticles=function(type){
+    if(!onProfilePage()) { clearParticleLayers(); return; }
+    return typeof oldCreate==='function' ? oldCreate.apply(this, arguments) : undefined;
+  };
+  try{ if(typeof createProfileParticles!=='undefined') createProfileParticles=window.createProfileParticles; }catch(e){}
+
+  const oldRender=window.renderProfile;
+  window.renderProfile=function(){
+    if(typeof oldRender==='function') oldRender.apply(this, arguments);
+    setTimeout(renderSelosOnce, 0);
+    setTimeout(renderSelosOnce, 120);
+  };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  document.addEventListener('DOMContentLoaded',()=>{ clearParticleLayers(); renderSelosOnce(); });
+  window.addEventListener('hashchange',()=>setTimeout(()=>{ clearParticleLayers(); renderSelosOnce(); },80));
+  document.addEventListener('click',()=>setTimeout(()=>{ clearParticleLayers(); renderSelosOnce(); },80),true);
+  setInterval(()=>{ clearParticleLayers(); renderSelosOnce(); },1500);
+})();
