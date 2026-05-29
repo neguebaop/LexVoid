@@ -4829,3 +4829,43 @@ body:not(.profile-open) #lexFallingParticles{display:none!important;}
   visibility:visible!important;
   opacity:1!important;
 }
+
+/* ===== LEXVOID PATCH: login limpo sem partículas ===== */
+body.lex-auth-clean #particlesCanvas,
+body.lex-auth-clean #lvRainParticles,
+body.lex-auth-clean #lexFallingParticles,
+body.lex-auth-clean #profileParticleLayer,
+body.lex-auth-clean .dlinky-final-particles,
+body.lex-auth-clean .dlinky-real-fall,
+body.lex-auth-clean .dlinky-particles-rain,
+body.lex-auth-clean .lexvoid-particle-layer,
+body.lex-auth-clean .lex-particle-layer,
+body.lex-auth-clean .lex-fall-particle,
+body.lex-auth-clean .particle,
+body.lex-auth-clean .snow,
+body.lex-auth-clean .bolt,
+body.lex-auth-clean .star,
+body.lex-auth-clean .ember,
+body.lex-auth-clean .heart,
+body.lex-auth-clean .rain,
+body.lex-auth-clean .leaf,
+body.lex-auth-clean .matrix,
+body.lex-auth-clean .cat{
+  display:none!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+#profileName .lex-name-selo-wrap,
+.profile-name-selos{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  margin-left:8px!important;
+  vertical-align:middle!important;
+}
+#profileName .lex-name-selo-wrap img,
+.profile-name-selos img{
+  object-fit:contain!important;
+  flex:0 0 auto!important;
+}
