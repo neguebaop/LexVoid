@@ -3774,3 +3774,90 @@ loadLandingFeatured();
   const oldCreate=window.createProfileParticles; window.createProfileParticles=function(type){try{if(oldCreate)oldCreate.apply(this,arguments)}catch(e){} setTimeout(renderRain,40)}; try{createProfileParticles=window.createProfileParticles}catch(e){}
   setInterval(renderRain,700); document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{rewriteButtons();cleanBrokenProfileImgs();renderRain();},800)});
 })();
+
+/* === LEXVOID PATCH FINAL: insígnia fixa abaixo do @, remover moldura só do perfil, partículas descendo só no perfil === */
+(function(){
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const save=async msg=>{try{if(typeof saveUser==='function') await saveUser(msg||'Salvo!')}catch(e){}};
+  const isProfile=()=> $('#profile')?.classList.contains('active') || /^#\/(?!dashboard|loja|shop|login)/.test(location.hash||'');
+  function inv(){ if(!window.user) window.user={}; if(!Array.isArray(user.inventory)) user.inventory=[]; return user.inventory; }
+  function srcOf(it){return it?.url||it?.value||it?.img||it?.image||it?.imageUrl||'';}
+  function same(a,b){ const au=norm(srcOf(a)), bu=norm(srcOf(b)); return (!!au&&!!bu&&au===bu) || (norm(a?.name)&&norm(a?.name)===norm(b?.name)); }
+  function typeOf(it){ const t=norm(it?.type); if(t.includes('frame')||t.includes('moldura'))return'frame'; if(t.includes('effect')||t.includes('efeito'))return'effect'; if(t.includes('selo')||t.includes('seal'))return'selo'; if(t.includes('insign')||t.includes('badge'))return'insignia'; return t; }
+
+  function renderInsigniasBelowSlug(){
+    const slug=$('#profileSlug2')||$('#profileSlug')||$('.profile-slug');
+    if(!slug || !window.user) return;
+    let box=$('#profileInsignias');
+    if(!box){ box=document.createElement('div'); box.id='profileInsignias'; box.className='profile-insignias'; }
+    slug.insertAdjacentElement('afterend', box);
+    const arr=Array.isArray(user.insignias)?user.insignias:[];
+    box.innerHTML=arr.map(i=>{const u=srcOf(i);return u?`<img src="${String(u).replace(/"/g,'%22')}" title="${(i.name||'Insígnia').replace(/</g,'&lt;')}" style="width:${Number(i.size||34)}px;height:${Number(i.size||34)}px;object-fit:contain">`:''}).join('');
+    box.style.display=arr.length?'flex':'none';
+  }
+
+  // força aplicação/remover de insígnia e moldura sem tirar do inventário
+  document.addEventListener('click', async function(e){
+    const useIns=e.target.closest('[data-lvf-use-insignia]');
+    if(useIns){
+      e.preventDefault(); e.stopImmediatePropagation();
+      const it=inv()[Number(useIns.dataset.lvfUseInsignia)]; if(!it) return;
+      user.insignias=Array.isArray(user.insignias)?user.insignias:[];
+      if(!user.insignias.some(x=>same(x,it))) user.insignias.push({id:it.id,itemId:it.itemId,name:it.name,type:'insignia',url:srcOf(it),value:srcOf(it),size:Number(it.size||34)});
+      await save('Insígnia aplicada!'); renderInsigniasBelowSlug(); try{window.renderInventory&&window.renderInventory()}catch(_e){} return;
+    }
+    const rem=e.target.closest('[data-lvf-remove-profile], [data-remove-lex-profile-final], [data-remove-lex2-profile], [data-remove-inv]');
+    if(rem){
+      const idx=rem.dataset.lvfRemoveProfile ?? rem.dataset.removeLexProfileFinal ?? rem.dataset.removeLex2Profile ?? rem.dataset.removeInv;
+      const it=inv()[Number(idx)]; if(!it) return;
+      const t=typeOf(it); const u=norm(srcOf(it));
+      if(t==='frame'){
+        e.preventDefault(); e.stopImmediatePropagation();
+        user.frame=''; user.frameUrl=''; user.activeFrame=''; user.frameAdjust={x:0,y:0,scale:1,rotate:0};
+        const fr=$('#profileFrame'); if(fr){fr.removeAttribute('src');fr.style.display='none'}
+        await save('Moldura removida só do perfil.'); try{window.renderProfile&&window.renderProfile()}catch(_e){} try{window.renderInventory&&window.renderInventory()}catch(_e){} return;
+      }
+      if(t==='insignia'){
+        e.preventDefault(); e.stopImmediatePropagation();
+        user.insignias=(user.insignias||[]).filter(x=>!same(x,it));
+        await save('Insígnia removida só do perfil.'); renderInsigniasBelowSlug(); try{window.renderInventory&&window.renderInventory()}catch(_e){} return;
+      }
+    }
+  }, true);
+
+  // partículas: remove do dashboard e cria chuva real apenas no ver perfil
+  function particleType(){return String(user?.particleType||user?.particles?.type||user?.particlesType||'none');}
+  function renderVoidParticles(){
+    $('#lexFallingParticles')?.remove();
+    const type=particleType();
+    const on=window.user && isProfile() && (user.particles===true || (type && !/none|sem/i.test(type))) && !/none|sem/i.test(type);
+    let root=$('#lvRainParticles');
+    if(!on){root?.remove(); return;}
+    if(!root){root=document.createElement('div');root.id='lvRainParticles';document.body.appendChild(root);}
+    const map={snow:['❄','✻','❅'],neve:['❄','✻','❅'],raios:['⚡','ϟ'],stars:['✦','✧','✦'],estrelas:['✦','✧'],pink:['✦','✧','✶'],void:['✦','◆','✧'],dark:['✦','✶'],hearts:['❤','♡'],folhas:['🍃','🍂'],leaves:['🍃','🍂'],matrix:['0','1','▦'],rain:['╱','│'],chuva:['╱','│'],fire:['🔥','✹'],fogo:['🔥','✹']};
+    let key=Object.keys(map).find(k=>new RegExp(k,'i').test(type));
+    const chars=map[key||'void'];
+    const qty=Math.max(14,Math.min(140,Number(user.particleCount||user.particles?.quantity||45)));
+    const speed=Math.max(1,Math.min(10,Number(user.particleSpeed||5)));
+    const signature=type+'|'+qty+'|'+speed+'|'+(user.particleSize||'');
+    if(root.dataset.sig===signature) return;
+    root.dataset.sig=signature; root.innerHTML='';
+    const base=(user.particleSize==='large'?24:user.particleSize==='medium'?18:12);
+    for(let i=0;i<qty;i++){
+      const s=document.createElement('span');
+      s.textContent=chars[Math.floor(Math.random()*chars.length)];
+      s.style.left=(Math.random()*100)+'vw';
+      s.style.setProperty('--drift',(Math.random()*120-60)+'px');
+      s.style.animationDelay=(-Math.random()*10)+'s';
+      s.style.animationDuration=(Math.max(3,13-speed)+Math.random()*5)+'s';
+      s.style.fontSize=(base+Math.random()*base)+'px';
+      root.appendChild(s);
+    }
+  }
+  const oldRP=window.renderProfile;
+  window.renderProfile=function(){ if(oldRP) oldRP.apply(this,arguments); renderInsigniasBelowSlug(); setTimeout(renderVoidParticles,30); };
+  try{renderProfile=window.renderProfile}catch(e){}
+  setInterval(()=>{renderInsigniasBelowSlug(); renderVoidParticles();},900);
+})();
