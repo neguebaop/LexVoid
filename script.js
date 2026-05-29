@@ -4050,3 +4050,134 @@ loadLandingFeatured();
   document.addEventListener('click',()=>setTimeout(()=>{ clearParticleLayers(); renderSelosOnce(); },80),true);
   setInterval(()=>{ clearParticleLayers(); renderSelosOnce(); },1500);
 })();
+
+/* ===== LEXVOID PATCH DEFINITIVO — 1 selo no nome + login sem flocos ===== */
+(function(){
+  'use strict';
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const norm=v=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safe=s=>String(s||'').trim().replace(/"/g,'%22').replace(/'/g,'%27');
+
+  function authOpen(){
+    const h=String(location.hash||'').toLowerCase();
+    const auth=$('#auth');
+    return h.includes('login') || h.includes('register') || !!(auth && auth.classList.contains('active'));
+  }
+  function profileOpen(){
+    const h=String(location.hash||'').toLowerCase();
+    const p=$('#profile');
+    return !authOpen() && (h.startsWith('#/u/') || !!(p && p.classList.contains('active')));
+  }
+  function particleNodes(){
+    return $$([
+      '#lvRainParticles', '#lexFallingParticles', '#profileParticleLayer',
+      '.dlinky-final-particles', '.dlinky-real-fall', '.dlinky-particles-rain',
+      '.lexvoid-particle-layer', '.lex-particle-layer', '.lex-fall-particle'
+    ].join(','));
+  }
+  function cleanLoginParticles(){
+    document.body.classList.toggle('lex-auth-clean', authOpen());
+    if(authOpen() || !profileOpen()){
+      particleNodes().forEach(n=>{ try{ n.remove(); }catch(e){ try{n.innerHTML=''; n.style.display='none';}catch(_){} } });
+      const c=$('#particlesCanvas');
+      if(c){
+        try{ c.getContext('2d')?.clearRect(0,0,c.width||innerWidth,c.height||innerHeight); }catch(e){}
+        if(authOpen()) c.style.setProperty('display','none','important');
+      }
+    }else{
+      const c=$('#particlesCanvas');
+      if(c) c.style.removeProperty('display');
+    }
+  }
+
+  function seloKey(s){ return norm(s?.url||s?.value||s?.img||s?.image||'') || norm(s?.id||s?.itemId||s?.name||''); }
+  function onlyOneSelo(arr){
+    arr = Array.isArray(arr) ? arr.filter(Boolean) : [];
+    if(!arr.length) return [];
+    const first = arr.find(s=>seloKey(s)) || arr[0];
+    const url = first.url || first.value || first.img || first.image || '';
+    if(!url) return [];
+    return [{
+      id:first.id||first.itemId||seloKey(first),
+      itemId:first.itemId||first.id||seloKey(first),
+      name:first.name||'Selo',
+      url:url,
+      value:url,
+      size:Number(first.size||28)
+    }];
+  }
+  let lastSavedKey='';
+  async function persistOneSelo(){
+    try{
+      if(!window.user) return;
+      const one=onlyOneSelo(user.selos);
+      const key=JSON.stringify(one);
+      if(JSON.stringify(user.selos||[])!==key){
+        user.selos=one;
+        if(key!==lastSavedKey && typeof saveUser==='function'){
+          lastSavedKey=key;
+          await saveUser('Selo do perfil corrigido.');
+        }
+      }
+    }catch(e){}
+  }
+  function renderOneSelo(){
+    try{
+      if(!window.user) return;
+      user.selos=onlyOneSelo(user.selos);
+      $$('#profileSelos,.profile-selos,#profileNameSelos,.profile-name-selos,#profileName .lex-name-selo-wrap').forEach(x=>x.remove());
+      const name=$('#profileName');
+      const s=user.selos[0];
+      if(!name || !s) return;
+      const wrap=document.createElement('span');
+      wrap.id='profileNameSelos';
+      wrap.className='profile-name-selos lex-name-selo-wrap';
+      wrap.innerHTML=`<img title="${esc(s.name||'Selo')}" src="${safe(s.url||s.value||'')}" style="width:${Number(s.size||28)}px;height:${Number(s.size||28)}px;object-fit:contain">`;
+      name.appendChild(wrap);
+    }catch(e){}
+  }
+
+  // Ao clicar em "Usar" em selo, troca o selo atual em vez de adicionar outro.
+  document.addEventListener('click', async function(e){
+    const btn=e.target.closest('[data-use-lex2-selo],[data-lvf-use-selo],[data-lvx-use]');
+    if(!btn || !window.user) return;
+    const idx = btn.dataset.useLex2Selo ?? btn.dataset.lvfUseSelo ?? btn.dataset.lvxUse;
+    const it = Array.isArray(user.inventory) ? user.inventory[Number(idx)] : null;
+    const typ = norm(it?.type||'');
+    const isSelo = it && (typ.includes('selo') || typ.includes('seal'));
+    if(!isSelo) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const url=it.url||it.value||it.img||it.image||'';
+    user.selos=url?[{id:it.id||it.itemId||url,itemId:it.itemId||it.id||url,name:it.name||'Selo',url,value:url,size:Number(it.size||28)}]:[];
+    try{ if(typeof saveUser==='function') await saveUser('Selo aplicado!'); }catch(_e){}
+    renderOneSelo();
+    try{ window.renderInventory&&window.renderInventory(); }catch(_e){}
+  }, true);
+
+  const oldCreate=window.createProfileParticles;
+  window.createProfileParticles=function(){
+    cleanLoginParticles();
+    if(!profileOpen()) return;
+    return typeof oldCreate==='function' ? oldCreate.apply(this, arguments) : undefined;
+  };
+  try{ if(typeof createProfileParticles!=='undefined') createProfileParticles=window.createProfileParticles; }catch(e){}
+
+  const oldRender=window.renderProfile;
+  window.renderProfile=function(){
+    const r = typeof oldRender==='function' ? oldRender.apply(this, arguments) : undefined;
+    cleanLoginParticles();
+    renderOneSelo();
+    setTimeout(renderOneSelo,80);
+    setTimeout(cleanLoginParticles,80);
+    persistOneSelo();
+    return r;
+  };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+
+  document.addEventListener('DOMContentLoaded',()=>{cleanLoginParticles(); renderOneSelo(); persistOneSelo();});
+  window.addEventListener('hashchange',()=>setTimeout(()=>{cleanLoginParticles(); renderOneSelo(); persistOneSelo();},50));
+  setInterval(()=>{cleanLoginParticles(); renderOneSelo();},250);
+})();
