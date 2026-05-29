@@ -4776,3 +4776,13 @@ body:not(:has(#profile.active)) #lexFallingParticles{display:none!important;visi
   visibility:hidden!important;
   border:0!important;
 }
+
+/* === HOTFIX FINAL: esconder moldura vazia e partículas caindo reais === */
+.profile-card img[src=""], .profile-card img:not([src]), .profile-card img[src="undefined"], .profile-card img[src="null"],
+.profile-avatar-wrap img[src=""], .profile-avatar-wrap img:not([src]), .profile-frame img[src=""], .profile-frame img:not([src]){
+  display:none!important; opacity:0!important; visibility:hidden!important; width:0!important; height:0!important; border:0!important;
+}
+#lvRainParticles{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden;}
+#lvRainParticles span{position:absolute;top:-40px;display:block;filter:drop-shadow(0 0 7px currentColor);opacity:.9;animation:lvRainFall linear infinite;will-change:transform;}
+@keyframes lvRainFall{0%{transform:translate3d(0,-60px,0) rotate(0deg);opacity:0}8%{opacity:1}100%{transform:translate3d(var(--drift,30px),110vh,0) rotate(360deg);opacity:.15}}
+.lex-buy-card .buy-preview img,.lex-gift-card .buy-preview img{max-width:120px;max-height:120px;object-fit:contain}
