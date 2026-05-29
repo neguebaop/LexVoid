@@ -4756,3 +4756,8 @@ body:not(.lex-owner-profile) #profile #backToDash[data-force-hide="1"]{display:n
 @keyframes lexFall{0%{transform:translate3d(0,-40px,0) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translate3d(40px,110vh,0) rotate(360deg);opacity:.15}}
 #tab-adminInsignias{padding:24px;max-width:1400px;}
 #adminInsigniasList .admin-effect-row-clean{display:flex;align-items:center;gap:14px;margin:10px 0;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(255,255,255,.04)}
+
+/* HOTFIX: partículas nunca aparecem no dashboard, só no perfil */
+body:not(:has(#profile.active)) #lexFallingParticles{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#lexFallingParticles{pointer-events:none!important;z-index:1!important;}
+.admin-only:not(.show){display:none!important;}
