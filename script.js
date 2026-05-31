@@ -4181,3 +4181,60 @@ loadLandingFeatured();
   window.addEventListener('hashchange',()=>setTimeout(()=>{cleanLoginParticles(); renderOneSelo(); persistOneSelo();},50));
   setInterval(()=>{cleanLoginParticles(); renderOneSelo();},250);
 })();
+
+/* ===== LEXVOID HOTFIX FINAL — SALVAR E APLICAR DESFOQUE/OPACIDADE DO CARD ===== */
+(function(){
+  const $ = (s,r=document)=>r.querySelector(s);
+  function num(v,fb){ v=Number(v); return Number.isFinite(v)?v:fb; }
+  function getUser(){ return window.user || (typeof user !== 'undefined' ? user : {}); }
+  function applyCardVisuals(){
+    const u=getUser();
+    const card=$('#profileCard');
+    if(!card) return;
+    const alpha=Math.max(0.05, Math.min(1, num(u.cardOpacity ?? u.layoutOpacity ?? 0.72, 0.72)));
+    const blur=Math.max(0, Math.min(60, num(u.cardBlur ?? u.layoutBlur ?? 14, 14)));
+    card.style.setProperty('--card-alpha', String(alpha));
+    card.style.setProperty('--card-blur', blur+'px');
+    card.style.setProperty('--dlinky-card-opacity', String(alpha));
+    card.style.setProperty('--dlinky-card-blur', blur+'px');
+    card.style.setProperty('--cardOpacity', String(alpha));
+    card.style.setProperty('--profileBlur', blur+'px');
+    card.style.background = `rgba(12,13,20,${alpha})`;
+    card.style.backgroundColor = `rgba(12,13,20,${alpha})`;
+    card.style.webkitBackdropFilter = `blur(${blur}px) saturate(135%)`;
+    card.style.backdropFilter = `blur(${blur}px) saturate(135%)`;
+  }
+  function fillSliders(){
+    const u=getUser();
+    const op=Math.round(num(u.cardOpacity ?? u.layoutOpacity ?? 0.72,0.72)*100);
+    const bl=num(u.cardBlur ?? u.layoutBlur ?? 14,14);
+    if($('#fxCardOpacity')) $('#fxCardOpacity').value=op;
+    if($('#fxCardBlur')) $('#fxCardBlur').value=bl;
+    if($('#layoutOpacity')) $('#layoutOpacity').value=op;
+    if($('#layoutBlur')) $('#layoutBlur').value=bl;
+  }
+  function readSliders(){
+    const u=getUser();
+    const opEl=$('#fxCardOpacity') || $('#layoutOpacity');
+    const blEl=$('#fxCardBlur') || $('#layoutBlur');
+    if(opEl){ u.cardOpacity=num(opEl.value,72)/100; u.layoutOpacity=u.cardOpacity; }
+    if(blEl){ u.cardBlur=num(blEl.value,14); u.layoutBlur=u.cardBlur; }
+    window.user=u;
+    applyCardVisuals();
+  }
+  const oldRenderProfile=window.renderProfile;
+  window.renderProfile=function(){ if(typeof oldRenderProfile==='function') oldRenderProfile.apply(this,arguments); setTimeout(applyCardVisuals,0); };
+  try{ if(typeof renderProfile!=='undefined') renderProfile=window.renderProfile; }catch(e){}
+  const oldRenderDash=window.renderDash;
+  window.renderDash=function(){ if(typeof oldRenderDash==='function') oldRenderDash.apply(this,arguments); setTimeout(fillSliders,0); };
+  try{ if(typeof renderDash!=='undefined') renderDash=window.renderDash; }catch(e){}
+  document.addEventListener('input',function(e){
+    if(e.target && ['fxCardOpacity','fxCardBlur','layoutOpacity','layoutBlur'].includes(e.target.id)) readSliders();
+  },true);
+  document.addEventListener('click',async function(e){
+    if(!e.target || !['saveCustom','saveFxOnly','saveFxOnlyFinal','saveLayout'].includes(e.target.id)) return;
+    readSliders();
+    try{ if(typeof saveUser==='function') await saveUser('Desfoque/opacidade salvos!'); }catch(_e){}
+  },true);
+  setTimeout(()=>{fillSliders(); applyCardVisuals();},500);
+})();
