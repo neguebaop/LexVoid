@@ -4869,3 +4869,20 @@ body.lex-auth-clean .cat{
   object-fit:contain!important;
   flex:0 0 auto!important;
 }
+
+/* ===== LEXVOID HOTFIX FINAL — DESFOQUE/OPACIDADE DO CARD FUNCIONANDO ===== */
+#profileCard.profile-wrap,
+body #profileCard.profile-wrap,
+.profile-page #profileCard.profile-wrap{
+  background: rgba(12,13,20,var(--card-alpha,.72)) !important;
+  background-color: rgba(12,13,20,var(--card-alpha,.72)) !important;
+  -webkit-backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
+  backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
+}
+#profileCard.profile-wrap.fx-border-run{
+  background:
+    linear-gradient(rgba(12,13,20,var(--card-alpha,.72)),rgba(12,13,20,var(--card-alpha,.72))) padding-box,
+    conic-gradient(from var(--ang,0deg),#7c3aed,#ec4899,#2f7dff,#7c3aed) border-box !important;
+  -webkit-backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
+  backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
+}
