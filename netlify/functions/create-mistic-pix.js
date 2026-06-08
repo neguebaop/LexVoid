@@ -25,11 +25,11 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const clientId = process.env.MISTIC_CLIENT_ID;
-    const clientSecret = process.env.MISTIC_CLIENT_SECRET;
+    const clientId = process.env.MYSTIC_CLIENT_ID || process.env.MISTIC_CLIENT_ID;
+    const clientSecret = process.env.MYSTIC_CLIENT_SECRET || process.env.MISTIC_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      return json(500, { error: 'Configure MISTIC_CLIENT_ID e MISTIC_CLIENT_SECRET no Netlify e faça redeploy.' });
+      return json(500, { error: 'Configure MYSTIC_CLIENT_ID/MYSTIC_CLIENT_SECRET no Netlify e faça redeploy. Também aceito MISTIC_CLIENT_ID/MISTIC_CLIENT_SECRET.' });
     }
 
     const amount = Number(body.amount || 0);
