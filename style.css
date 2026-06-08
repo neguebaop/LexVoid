@@ -4886,3 +4886,8 @@ body #profileCard.profile-wrap,
   -webkit-backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
   backdrop-filter: blur(var(--card-blur,14px)) saturate(135%) !important;
 }
+
+
+/* LexVoid: usuários destaque clicáveis */
+.zyo-marquee-track a.featured-pill{color:inherit;text-decoration:none;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;}
+.zyo-marquee-track a.featured-pill:hover{transform:translateY(-2px);border-color:rgba(168,85,247,.75)!important;box-shadow:0 12px 30px rgba(168,85,247,.18)!important;}
