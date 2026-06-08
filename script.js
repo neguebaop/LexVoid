@@ -4238,3 +4238,83 @@ loadLandingFeatured();
   },true);
   setTimeout(()=>{fillSliders(); applyCardVisuals();},500);
 })();
+
+
+/* ===== LEXVOID PATCH — MisticPay aliases + usuários destaque clicáveis ===== */
+(function(){
+  'use strict';
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const cleanSlugLocal=v=>String(v||'usuario').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_-]/g,'').slice(0,30)||'usuario';
+  const avatarCss=u=>String(u||'').trim()?`url('${esc(String(u).trim())}')`:'none';
+
+  function profileHref(slug){ return '#/'+cleanSlugLocal(slug); }
+
+  window.lexOpenFeaturedProfile=function(slug){
+    const s=cleanSlugLocal(slug);
+    location.hash='/'+s;
+  };
+
+  function makeFeaturedClickable(){
+    const track=$('.zyo-marquee-track');
+    if(!track) return;
+    $$('.featured-pill, .zyo-marquee-track > span', track).forEach(el=>{
+      if(el.tagName==='A') return;
+      let slug=el.dataset.slug || '';
+      if(!slug){
+        const small=el.querySelector('small');
+        slug=(small?.textContent||'').replace('@','').replace('/','').trim();
+      }
+      if(!slug){
+        const txt=(el.textContent||'').trim().split(/\s+/).pop()||'';
+        slug=txt.replace('@','').replace('/','');
+      }
+      slug=cleanSlugLocal(slug);
+      const a=document.createElement('a');
+      a.className=el.className || 'featured-pill';
+      a.href=profileHref(slug);
+      a.dataset.slug=slug;
+      a.innerHTML=el.innerHTML;
+      a.setAttribute('aria-label','Abrir perfil '+slug);
+      el.replaceWith(a);
+    });
+  }
+
+  const oldRenderLanding=window.renderLandingFeatured;
+  window.renderLandingFeatured=function(users){
+    const track=$('.zyo-marquee-track');
+    if(!track){ if(typeof oldRenderLanding==='function') oldRenderLanding(users); return; }
+    const arr=(Array.isArray(users)&&users.length?users:[]);
+    if(!arr.length){ if(typeof oldRenderLanding==='function') oldRenderLanding(users); setTimeout(makeFeaturedClickable,30); return; }
+    const items=arr.concat(arr);
+    track.innerHTML=items.map(u=>{
+      const slug=cleanSlugLocal(u.slug||u.username||u.name);
+      const name=esc(u.name||u.slug||'Usuário');
+      return `<a class="featured-pill" href="#/${slug}" data-slug="${slug}" aria-label="Abrir perfil ${esc(slug)}"><i class="featured-avatar-mini" style="background-image:${avatarCss(u.avatar)}"></i><b>${name}</b><small>/${esc(slug)}</small></a>`;
+    }).join('');
+    makeFeaturedClickable();
+  };
+  try{ if(typeof renderLandingFeatured!=='undefined') renderLandingFeatured=window.renderLandingFeatured; }catch(e){}
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(makeFeaturedClickable,200));
+  window.addEventListener('hashchange',()=>setTimeout(makeFeaturedClickable,200));
+  setInterval(makeFeaturedClickable,1500);
+
+  const oldPix=window.openPixRecharge;
+  window.openPixRecharge=async function(coins){
+    const r= typeof oldPix==='function' ? await oldPix.apply(this,arguments) : undefined;
+    setTimeout(()=>{
+      const key=$('#dlinkyPixKey');
+      const qr=$('#dlinkyPixQr');
+      if(key && /MisticPay ainda|Aguardando endpoint|MISTIC_CLIENT/i.test(key.value||'')){
+        key.value='Aguardando retorno da MysticPay. Verifique MYSTIC_CLIENT_ID e MYSTIC_CLIENT_SECRET no Netlify e faça redeploy.';
+      }
+      if(qr && /Configure MISTIC|MisticPay conectada: falta endpoint/i.test(qr.textContent||'')){
+        qr.innerHTML='<div class="dlinky-pix-qr-fake small-pix-msg">MysticPay encontrada no projeto. Configure MYSTIC_CLIENT_ID/MYSTIC_CLIENT_SECRET e faça redeploy.</div>';
+      }
+    },1100);
+    return r;
+  };
+  try{ if(typeof openPixRecharge!=='undefined') openPixRecharge=window.openPixRecharge; }catch(e){}
+})();
