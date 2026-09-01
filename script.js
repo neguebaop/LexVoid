@@ -40,11 +40,18 @@ const defaultUser = {
 
 let user = {...defaultUser};
 let currentAuthUser = null;
+let registrationInProgress = false;
 let assetMode = 'backgrounds';
 let shopMode = 'coins';
 let inventoryFilter = 'todos';
 let routeToken = 0;
 const ADMIN_EMAILS = ['jailtonsilas48@gmail.com','amoester199@gmail.com'];
+const IDENTITY_REPAIR_VERSION = 1;
+// Recupera uma vez o perfil original que foi misturado pelo bug antigo.
+// Depois da migração o usuário continua livre para alterar o @ normalmente.
+const LEGACY_CANONICAL_SLUGS = Object.freeze({
+  'jailtonsilas48@gmail.com':'linkroubadao'
+});
 let customFrames = [];
 let adminSelos = [];
 let landingFeaturedUsers = [];
@@ -110,29 +117,154 @@ function publicData(u){
   delete copy.password;
   return copy;
 }
+function normalizedEmail(value){
+  return String(value || '').toLowerCase().trim();
+}
+function identityOwnerMatches(data, fbUser){
+  if(!data || !fbUser) return false;
+  const dataUid = String(data.uid || '').trim();
+  const dataEmail = normalizedEmail(data.email);
+  const authEmail = normalizedEmail(fbUser.email);
+  if(dataUid) return dataUid === fbUser.uid;
+  return !!dataEmail && !!authEmail && dataEmail === authEmail;
+}
+function slugTakenError(){
+  const err = new Error('Este @nome já pertence a outra conta. Escolha outro.');
+  err.code = 'lexvoid/slug-taken';
+  return err;
+}
+async function assertSlugAvailable(slug, ownerUid=''){
+  slug = cleanSlug(slug);
+  const profileSnap = await db.collection('profiles').doc(slug).get();
+  const profileUid = profileSnap.exists ? String(profileSnap.data()?.uid || '') : '';
+  if(profileUid && profileUid !== ownerUid) throw slugTakenError();
+  // Perfis muito antigos sem uid também são tratados como ocupados no cadastro,
+  // evitando que uma conta nova herde os dados de outra pessoa.
+  if(!ownerUid && profileSnap.exists) throw slugTakenError();
+  return true;
+}
+async function repairPublicMirror(data, fbUser){
+  if(!data || !fbUser) return data;
+  let slug = cleanSlug(data.slug);
+  let profileRef = db.collection('profiles').doc(slug);
+  let profileSnap = await profileRef.get();
+
+  if(profileSnap.exists && !identityOwnerMatches(profileSnap.data(), fbUser)){
+    const suffix = '-' + String(fbUser.uid || '').slice(0,6).toLowerCase();
+    slug = cleanSlug(slug.slice(0, Math.max(1, 30 - suffix.length)) + suffix);
+    profileRef = db.collection('profiles').doc(slug);
+    profileSnap = await profileRef.get();
+    if(profileSnap.exists && !identityOwnerMatches(profileSnap.data(), fbUser)) throw slugTakenError();
+    data = {...data, slug};
+  }
+
+  const repaired = {
+    ...data,
+    uid:fbUser.uid,
+    email:normalizedEmail(fbUser.email),
+    slug,
+    identityRepairVersion:IDENTITY_REPAIR_VERSION
+  };
+  const batch = db.batch();
+  batch.set(db.collection('users').doc(fbUser.uid), publicData(repaired), {merge:true});
+  batch.set(profileRef, publicData(repaired), {merge:true});
+  await batch.commit();
+  return repaired;
+}
 async function loadUserByUid(uid){
   if(!uid) return mergeUser(defaultUser);
+  const fbUser = auth.currentUser;
+  if(!fbUser || fbUser.uid !== uid) return mergeUser(defaultUser);
   const snap = await db.collection('users').doc(uid).get();
-  if(snap.exists) return mergeUser(snap.data());
-  return mergeUser({...defaultUser, uid, email:(auth.currentUser?.email || '').toLowerCase()});
+  let data = snap.exists ? snap.data() : null;
+  const authEmail = normalizedEmail(fbUser.email);
+
+  // Migração pontual do perfil do administrador atingido pelo bug antigo.
+  // O marcador impede que o @ seja forçado novamente depois da primeira correção.
+  const canonical = LEGACY_CANONICAL_SLUGS[authEmail];
+  if(canonical && Number(data?.identityRepairVersion || 0) < IDENTITY_REPAIR_VERSION){
+    const canonicalSnap = await db.collection('profiles').doc(canonical).get();
+    if(canonicalSnap.exists && identityOwnerMatches(canonicalSnap.data(), fbUser)){
+      data = {...canonicalSnap.data(), slug:canonical};
+    }
+  }
+
+  // Nunca carrega no painel um documento pertencente a outra conta.
+  if(data && !identityOwnerMatches(data, fbUser)) data = null;
+  if(!data) data = {...defaultUser, uid, email:authEmail};
+  data = await repairPublicMirror({...data, uid, email:authEmail}, fbUser);
+  return mergeUser(data);
 }
 async function loadProfileBySlug(slug){
   slug = cleanSlug(slug);
   const snap = await db.collection('profiles').doc(slug).get();
-  if(snap.exists) return mergeUser(snap.data());
+  if(snap.exists) return mergeUser({...snap.data(), slug});
   return mergeUser({...defaultUser, slug});
 }
 async function saveUser(message='Salvo com sucesso!'){
-  if(!currentAuthUser){ toast('Faça login para salvar.'); return; }
-  user.uid = currentAuthUser.uid;
-  user.email = (currentAuthUser.email || user.email || '').toLowerCase().trim();
-  user.slug = cleanSlug(user.slug);
-  user.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-  await db.collection('users').doc(currentAuthUser.uid).set(publicData(user), {merge:true});
-  await db.collection('profiles').doc(user.slug).set(publicData(user), {merge:true});
-  renderDash();
-  if($('#profile')?.classList.contains('active')) renderProfile();
-  if(message) toast(message);
+  if(!currentAuthUser){ toast('Faça login para salvar.'); return false; }
+
+  // Um perfil público visitado nunca pode virar os dados da conta conectada.
+  const authEmail = normalizedEmail(currentAuthUser.email);
+  const viewingPublicProfile = !!$('#profile')?.classList.contains('active');
+  const foreignUid = !!user.uid && user.uid !== currentAuthUser.uid;
+  const foreignEmail = !!normalizedEmail(user.email) && normalizedEmail(user.email) !== authEmail;
+  if(viewingPublicProfile) return false;
+  if(foreignUid || foreignEmail){
+    await loadUserByUid(currentAuthUser.uid);
+    if(message) toast('Conta protegida: o perfil visitado não foi salvo sobre o seu.');
+    return false;
+  }
+
+  const nextSlug = cleanSlug(user.slug);
+  try{
+    await db.runTransaction(async tx => {
+      const userRef = db.collection('users').doc(currentAuthUser.uid);
+      const profileRef = db.collection('profiles').doc(nextSlug);
+      const accountSnap = await tx.get(userRef);
+      const profileSnap = await tx.get(profileRef);
+      const previousSlug = accountSnap.exists ? cleanSlug(accountSnap.data()?.slug || '') : '';
+      let oldProfileRef = null, oldProfileSnap = null;
+      if(previousSlug && previousSlug !== nextSlug){
+        oldProfileRef = db.collection('profiles').doc(previousSlug);
+        oldProfileSnap = await tx.get(oldProfileRef);
+      }
+
+      if(profileSnap.exists && !identityOwnerMatches(profileSnap.data(), currentAuthUser)) throw slugTakenError();
+
+      const now = firebase.firestore.FieldValue.serverTimestamp();
+      const data = publicData({
+        ...user,
+        uid:currentAuthUser.uid,
+        email:authEmail,
+        slug:nextSlug,
+        identityRepairVersion:IDENTITY_REPAIR_VERSION,
+        updatedAt:now
+      });
+      if(!accountSnap.exists) data.createdAt = now;
+      tx.set(userRef, data, {merge:true});
+      tx.set(profileRef, data, {merge:true});
+
+      if(oldProfileRef && oldProfileSnap?.exists && identityOwnerMatches(oldProfileSnap.data(), currentAuthUser)) tx.delete(oldProfileRef);
+    });
+    user.uid = currentAuthUser.uid;
+    user.email = authEmail;
+    user.slug = nextSlug;
+    user.identityRepairVersion = IDENTITY_REPAIR_VERSION;
+    renderDash();
+    if(message) toast(message);
+    return true;
+  }catch(err){
+    if(err?.code === 'lexvoid/slug-taken'){
+      await loadUserByUid(currentAuthUser.uid);
+      renderDash();
+      toast(err.message);
+      return false;
+    }
+    console.error('Falha ao salvar conta:', err);
+    toast('Não foi possível salvar agora. Tente novamente.');
+    return false;
+  }
 }
 function addHistory(t){
   user.history = [`${new Date().toLocaleString('pt-BR')} — ${t}`, ...(user.history || [])].slice(0,30);
@@ -172,7 +304,13 @@ async function route(){
   if(h === '#/' || h === '#') { showPage('#landing'); setTimeout(animateLandingCounters, 50); return; }
   if(h === '#/register') { showPage('#auth'); $('#registerForm')&&( $('#registerForm').style.display='block'); $('#loginForm')&&($('#loginForm').style.display='none'); return; }
   if(h === '#/login') { showPage('#auth'); $('#registerForm')&&( $('#registerForm').style.display='none'); $('#loginForm')&&($('#loginForm').style.display='block'); return; }
-  if(h === '#/dashboard') { showPage('#dashboard'); renderDash(); return; }
+  if(h === '#/dashboard') {
+    showPage('#dashboard');
+    if(currentAuthUser) await loadUserByUid(currentAuthUser.uid);
+    if(token !== routeToken) return;
+    renderDash();
+    return;
+  }
   if(h === '#/assets') { simple('Linky Assets','Área de backgrounds, banners e decorações.'); return; }
   if(h === '#/premium') { simple('Premium LexVoid','Área premium em construção.'); return; }
 
@@ -1073,14 +1211,29 @@ function bindEvents(){
   $('#registerForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     if($('#regPass').value !== $('#regPass2').value) return toast('As senhas não conferem');
+    let createdUser = null;
+    registrationInProgress = true;
     try{
+      const requestedSlug = cleanSlug($('#regSlug').value);
+      await assertSlugAvailable(requestedSlug);
       const cred = await auth.createUserWithEmailAndPassword($('#regEmail').value.trim(), $('#regPass').value);
+      createdUser = cred.user;
       currentAuthUser = cred.user;
-      mergeUser({...defaultUser, uid:cred.user.uid, name:$('#regName').value.trim() || 'Usuário', slug:cleanSlug($('#regSlug').value), email:cred.user.email});
+      mergeUser({...defaultUser, uid:cred.user.uid, name:$('#regName').value.trim() || 'Usuário', slug:requestedSlug, email:cred.user.email});
       addHistory('Conta registrada');
-      await saveUser('Conta criada!');
+      const saved = await saveUser('Conta criada!');
+      if(!saved){
+        try{ await createdUser.delete(); }catch(_deleteError){}
+        currentAuthUser = null;
+        return;
+      }
       location.hash = '#/dashboard';
-    }catch(err){ toast('Erro ao registrar: ' + err.message); }
+    }catch(err){
+      if(createdUser){ try{ await createdUser.delete(); }catch(_deleteError){} }
+      toast(err?.code === 'lexvoid/slug-taken' ? err.message : 'Erro ao registrar: ' + err.message);
+    }finally{
+      registrationInProgress = false;
+    }
   });
   $('#loginForm')?.addEventListener('submit', async e => {
     e.preventDefault();
@@ -1229,26 +1382,16 @@ function bindEvents(){
 
 function startDashboardParticles(){
   const canvas = $('#particlesCanvas'); if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let dots = [];
-  function resize(){
-    canvas.width = innerWidth; canvas.height = innerHeight;
-    dots = Array.from({length:14},()=>({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*1.8+1, v:Math.random()*0.35+0.1}));
-  }
-  addEventListener('resize', resize); resize();
-  function anim(){
-    if(!document.hidden && !$('#profile')?.classList.contains('active')){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = 'rgba(168,85,247,.65)';
-      dots.forEach(d=>{ d.y+=d.v; if(d.y>canvas.height)d.y=-5; ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2); ctx.fill(); });
-    }
-    requestAnimationFrame(anim);
-  }
-  requestAnimationFrame(anim);
+  // O canvas antigo criava pontos/flocos que piscavam na landing e no login.
+  // As partículas personalizadas continuam existindo exclusivamente no perfil.
+  try{ canvas.getContext('2d')?.clearRect(0,0,canvas.width||innerWidth,canvas.height||innerHeight); }catch(e){}
+  canvas.hidden = true;
+  canvas.style.setProperty('display','none','important');
 }
 
 auth.onAuthStateChanged(async fbUser => {
   currentAuthUser = fbUser || null;
+  if(registrationInProgress) return;
   if(fbUser){
     await loadUserByUid(fbUser.uid);
     await loadAdminData();
@@ -4080,15 +4223,23 @@ loadLandingFeatured();
   function cleanLoginParticles(){
     document.body.classList.toggle('lex-auth-clean', authOpen());
     if(authOpen() || !profileOpen()){
-      particleNodes().forEach(n=>{ try{ n.remove(); }catch(e){ try{n.innerHTML=''; n.style.display='none';}catch(_){} } });
+      particleNodes().forEach(n=>{
+        try{
+          // A camada estrutural precisa continuar no DOM para funcionar ao abrir um perfil.
+          if(n.id === 'profileParticleLayer'){
+            n.innerHTML='';
+            n.style.display='none';
+          }else n.remove();
+        }catch(e){}
+      });
       const c=$('#particlesCanvas');
       if(c){
         try{ c.getContext('2d')?.clearRect(0,0,c.width||innerWidth,c.height||innerHeight); }catch(e){}
-        if(authOpen()) c.style.setProperty('display','none','important');
+        c.style.setProperty('display','none','important');
       }
     }else{
-      const c=$('#particlesCanvas');
-      if(c) c.style.removeProperty('display');
+      const layer=$('#profileParticleLayer');
+      if(layer) layer.style.removeProperty('display');
     }
   }
 
